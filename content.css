@@ -1,0 +1,316 @@
+html.duochat-pending > body {
+  visibility: hidden !important;
+}
+
+#duochat-gate {
+  --dc-bg: #f5f7fb;
+  --dc-surface: #ffffff;
+  --dc-surface-soft: #f0f2ff;
+  --dc-text: #151629;
+  --dc-muted: #61657a;
+  --dc-border: #dfe2ec;
+  --dc-primary: #6558e8;
+  --dc-primary-hover: #5346d4;
+  --dc-focus: #2563eb;
+  --dc-danger: #b42318;
+  --dc-warning: #a15c00;
+  --dc-radius: 18px;
+  --dc-shadow: 0 24px 70px rgba(28, 26, 64, 0.16);
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  overflow: auto;
+  padding: 24px;
+  visibility: visible !important;
+  color: var(--dc-text);
+  background:
+    radial-gradient(circle at 18% 12%, rgba(101, 88, 232, 0.13), transparent 34%),
+    radial-gradient(circle at 88% 86%, rgba(18, 163, 139, 0.10), transparent 30%),
+    var(--dc-bg);
+  font: 400 16px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+#duochat-gate *,
+#duochat-gate *::before,
+#duochat-gate *::after {
+  box-sizing: border-box;
+}
+
+.duochat-panel {
+  width: min(100%, 520px);
+  padding: 30px;
+  border: 1px solid var(--dc-border);
+  border-radius: var(--dc-radius);
+  background: var(--dc-surface);
+  box-shadow: var(--dc-shadow);
+}
+
+.duochat-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.duochat-logo {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 14px;
+  color: #ffffff;
+  background: linear-gradient(135deg, #6558e8, #4b3fc5);
+  box-shadow: 0 8px 20px rgba(101, 88, 232, 0.25);
+}
+
+.duochat-logo svg {
+  width: 25px;
+  height: 25px;
+}
+
+.duochat-brand-copy strong,
+.duochat-brand-copy span {
+  display: block;
+}
+
+.duochat-brand-copy strong {
+  font-size: 17px;
+  line-height: 1.2;
+}
+
+.duochat-brand-copy span {
+  margin-top: 2px;
+  color: var(--dc-muted);
+  font-size: 13px;
+}
+
+.duochat-panel h1 {
+  margin: 0;
+  font-size: clamp(25px, 6vw, 34px);
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+}
+
+.duochat-lead {
+  margin: 10px 0 24px;
+  color: var(--dc-muted);
+}
+
+.duochat-form,
+.duochat-fields {
+  display: grid;
+  gap: 16px;
+}
+
+.duochat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.duochat-field {
+  display: grid;
+  gap: 7px;
+}
+
+.duochat-field label,
+.duochat-label {
+  color: var(--dc-text);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.duochat-field input {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid var(--dc-border);
+  border-radius: 11px;
+  outline: none;
+  color: var(--dc-text);
+  background: var(--dc-surface);
+  font: inherit;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.duochat-field input:focus-visible,
+.duochat-profile-choice:focus-visible,
+.duochat-button:focus-visible,
+.duochat-check input:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--dc-focus) 30%, transparent);
+  outline-offset: 2px;
+}
+
+.duochat-field input:focus {
+  border-color: var(--dc-primary);
+  box-shadow: 0 0 0 3px rgba(101, 88, 232, 0.12);
+}
+
+.duochat-profile-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.duochat-profile-choice {
+  min-height: 66px;
+  padding: 12px;
+  border: 1px solid var(--dc-border);
+  border-radius: 13px;
+  color: var(--dc-text);
+  background: var(--dc-surface);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.duochat-profile-choice:hover {
+  border-color: #b6b0f4;
+  background: var(--dc-surface-soft);
+}
+
+.duochat-profile-choice[aria-pressed="true"] {
+  border-color: var(--dc-primary);
+  background: var(--dc-surface-soft);
+  box-shadow: inset 0 0 0 1px var(--dc-primary);
+}
+
+.duochat-profile-choice strong,
+.duochat-profile-choice span {
+  display: block;
+}
+
+.duochat-profile-choice span {
+  margin-top: 2px;
+  color: var(--dc-muted);
+  font-size: 13px;
+}
+
+.duochat-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--dc-muted);
+  font-size: 14px;
+}
+
+.duochat-check input {
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--dc-primary);
+}
+
+.duochat-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.duochat-button {
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  cursor: pointer;
+  font: 650 14px/1.2 inherit;
+  transition: background 150ms ease, border-color 150ms ease, transform 150ms ease;
+}
+
+.duochat-button:hover {
+  transform: translateY(-1px);
+}
+
+.duochat-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+  transform: none;
+}
+
+.duochat-button-primary {
+  color: #ffffff;
+  background: var(--dc-primary);
+}
+
+.duochat-button-primary:hover {
+  background: var(--dc-primary-hover);
+}
+
+.duochat-button-secondary {
+  border-color: var(--dc-border);
+  color: var(--dc-text);
+  background: var(--dc-surface);
+}
+
+.duochat-error {
+  min-height: 21px;
+  margin: 0;
+  color: var(--dc-danger);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.duochat-note {
+  margin: 16px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--dc-border);
+  color: var(--dc-muted);
+  font-size: 13px;
+}
+
+a[data-duochat-hidden="true"] {
+  display: none !important;
+}
+
+a[data-duochat-unassigned="true"] {
+  outline: 2px dashed #c67900 !important;
+  outline-offset: -2px !important;
+}
+
+@media (max-width: 560px) {
+  #duochat-gate {
+    align-items: start;
+    padding: 12px;
+  }
+
+  .duochat-panel {
+    margin-top: 12px;
+    padding: 22px 18px;
+  }
+
+  .duochat-grid,
+  .duochat-profile-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  #duochat-gate {
+    --dc-bg: #11121a;
+    --dc-surface: #1b1c27;
+    --dc-surface-soft: #25243e;
+    --dc-text: #f6f5ff;
+    --dc-muted: #b7b6c8;
+    --dc-border: #343646;
+    --dc-primary: #8175f4;
+    --dc-primary-hover: #9389ff;
+    --dc-focus: #7db3ff;
+    --dc-danger: #ff8d83;
+    --dc-shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #duochat-gate *,
+  #duochat-gate *::before,
+  #duochat-gate *::after {
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}

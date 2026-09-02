@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>DuoChat</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main class="app">
+      <header class="header">
+        <div class="brand-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2.25 20 5.4v5.86c0 5.05-3.38 9.31-8 10.49-4.62-1.18-8-5.44-8-10.49V5.4l8-3.15Zm-1.07 5.18a3.04 3.04 0 0 0-3.04 3.04v.48H7.4a1.2 1.2 0 0 0-1.2 1.2v4.06a1.2 1.2 0 0 0 1.2 1.2h9.2a1.2 1.2 0 0 0 1.2-1.2v-4.06a1.2 1.2 0 0 0-1.2-1.2h-.49v-.48a3.04 3.04 0 0 0-3.04-3.04h-2.14Zm0 1.55h2.14c.82 0 1.49.67 1.49 1.49v.48h-5.12v-.48c0-.82.67-1.49 1.49-1.49Z"/></svg>
+        </div>
+        <div>
+          <h1>DuoChat</h1>
+          <p>Deux espaces locaux</p>
+        </div>
+        <span id="status-pill" class="status-pill">Chargement…</span>
+      </header>
+
+      <section id="loading-view" class="view" aria-live="polite">
+        <div class="skeleton skeleton-title"></div>
+        <div class="skeleton"></div>
+        <div class="skeleton"></div>
+      </section>
+
+      <section id="setup-view" class="view" hidden>
+        <div class="empty-icon" aria-hidden="true">2</div>
+        <h2>Configuration nécessaire</h2>
+        <p>Ouvre ChatGPT pour créer les deux utilisateurs et leurs mots de passe.</p>
+        <button id="open-chatgpt" class="button button-primary" type="button">Ouvrir ChatGPT</button>
+      </section>
+
+      <section id="locked-view" class="view" hidden>
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Espace verrouillé</span>
+            <h2>Qui utilise ChatGPT ?</h2>
+          </div>
+        </div>
+        <div id="locked-profiles" class="profile-grid" role="group" aria-label="Choix du profil"></div>
+        <form id="unlock-form" class="form">
+          <label for="unlock-password">Mot de passe</label>
+          <input id="unlock-password" name="password" type="password" autocomplete="current-password" required>
+          <p id="unlock-error" class="error" role="alert" aria-live="polite"></p>
+          <button class="button button-primary" type="submit">Ouvrir cet espace</button>
+        </form>
+      </section>
+
+      <section id="unlocked-view" class="view" hidden>
+        <div class="current-profile">
+          <div id="current-avatar" class="avatar">A</div>
+          <div class="current-copy">
+            <span>Espace actif</span>
+            <strong id="current-name">Utilisateur A</strong>
+          </div>
+          <span class="online-dot"><span></span>Ouvert</span>
+        </div>
+
+        <div class="setting-row">
+          <div>
+            <strong>Récupérer les anciens éléments</strong>
+            <p>Affiche les projets et discussions encore sans propriétaire.</p>
+          </div>
+          <label class="switch">
+            <input id="recovery-toggle" type="checkbox" aria-label="Mode récupération">
+            <span></span>
+          </label>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="section-heading compact">
+          <div>
+            <span class="eyebrow">Changer d’espace</span>
+            <h2>Autre utilisateur</h2>
+          </div>
+        </div>
+        <button id="switch-profile" class="profile-row" type="button">
+          <span id="other-avatar" class="avatar avatar-secondary">B</span>
+          <span class="profile-row-copy"><strong id="other-name">Utilisateur B</strong><small>Mot de passe requis</small></span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+
+        <form id="switch-form" class="form switch-form" hidden>
+          <label id="switch-label" for="switch-password">Mot de passe</label>
+          <input id="switch-password" name="password" type="password" autocomplete="current-password" required>
+          <p id="switch-error" class="error" role="alert" aria-live="polite"></p>
+          <div class="button-row">
+            <button class="button button-primary" type="submit">Changer d’espace</button>
+            <button id="cancel-switch" class="button button-secondary" type="button">Annuler</button>
+          </div>
+        </form>
+
+        <button id="lock-now" class="button button-quiet" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3m-9 0h8a2 2 0 0 1 2 2v7H6v-7a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Verrouiller maintenant
+        </button>
+      </section>
+
+      <footer>
+        Stockage local sur ce navigateur · Aucun mot de passe en clair
+      </footer>
+    </main>
+    <script src="core.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>
