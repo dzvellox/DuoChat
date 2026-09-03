@@ -6,9 +6,11 @@ html.duochat-pending > body {
   --dc-bg: #f5f7fb;
   --dc-surface: #ffffff;
   --dc-surface-soft: #f0f2ff;
+  --dc-surface-hover: #e8e7ff;
   --dc-text: #151629;
   --dc-muted: #61657a;
   --dc-border: #dfe2ec;
+  --dc-primary-border: #b6b0f4;
   --dc-primary: #6558e8;
   --dc-primary-hover: #5346d4;
   --dc-focus: #2563eb;
@@ -154,6 +156,9 @@ html.duochat-pending > body {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 2px;
 }
 
 .duochat-profile-choice {
@@ -170,8 +175,8 @@ html.duochat-pending > body {
 }
 
 .duochat-profile-choice:hover {
-  border-color: #b6b0f4;
-  background: var(--dc-surface-soft);
+  border-color: var(--dc-primary-border);
+  background: var(--dc-surface-hover);
 }
 
 .duochat-profile-choice[aria-pressed="true"] {
@@ -219,12 +224,19 @@ html.duochat-pending > body {
   border: 1px solid transparent;
   border-radius: 11px;
   cursor: pointer;
-  font: 650 14px/1.2 inherit;
+  font: inherit;
+  font-weight: 650;
+  line-height: 1.2;
   transition: background 150ms ease, border-color 150ms ease, transform 150ms ease;
 }
 
 .duochat-button:hover {
   transform: translateY(-1px);
+}
+
+.duochat-button:active,
+.duochat-profile-choice:active {
+  transform: translateY(0) scale(0.99);
 }
 
 .duochat-button:disabled {
@@ -246,6 +258,11 @@ html.duochat-pending > body {
   border-color: var(--dc-border);
   color: var(--dc-text);
   background: var(--dc-surface);
+}
+
+.duochat-button-secondary:hover {
+  border-color: var(--dc-primary-border);
+  background: var(--dc-surface-hover);
 }
 
 .duochat-error {
@@ -295,9 +312,11 @@ a[data-duochat-unassigned="true"] {
     --dc-bg: #11121a;
     --dc-surface: #1b1c27;
     --dc-surface-soft: #25243e;
+    --dc-surface-hover: #2d2b49;
     --dc-text: #f6f5ff;
     --dc-muted: #b7b6c8;
     --dc-border: #343646;
+    --dc-primary-border: #6d65ad;
     --dc-primary: #8175f4;
     --dc-primary-hover: #9389ff;
     --dc-focus: #7db3ff;

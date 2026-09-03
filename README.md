@@ -1,373 +1,406 @@
 <div align="center">
-  <img src="./icons/icon-128.png" width="104" height="104" alt="DuoChat Logo">
+  <img src="./icons/icon-128.png" width="104" height="104" alt="Logo DuoChat">
 
   <h1>DuoChat</h1>
 
-  <p><strong>Two local, password-protected spaces inside a single ChatGPT session.</strong></p>
+  <p><strong>Autant d’espaces locaux protégés par mot de passe que nécessaire sur ChatGPT et Claude.</strong></p>
 
   <p>
-    DuoChat separates the conversations and projects of two users sharing the same ChatGPT account in Chrome.
+    DuoChat sépare les conversations et les projets de plusieurs utilisateurs partageant ChatGPT ou Claude dans Chrome.
   </p>
 
   <p>
-    <img src="https://img.shields.io/badge/version-1.1.1-6558E8" alt="Version 1.1.1">
+    <img src="https://img.shields.io/badge/version-1.3.1-6558E8" alt="Version 1.3.1">
     <img src="https://img.shields.io/badge/Chrome-Manifest%20V3-4285F4?logo=googlechrome&logoColor=white" alt="Chrome Manifest V3">
-    <img src="https://img.shields.io/badge/tests-9%20passed-13866F" alt="9 tests passed">
-    <img src="https://img.shields.io/badge/license-AGPL--3.0%20%2B%20commercial-5C5C68" alt="AGPL-3.0 and commercial license">
+    <img src="https://img.shields.io/badge/tests-15%20passed-13866F" alt="15 tests réussis">
+    <img src="https://img.shields.io/badge/license-AGPL--3.0%20%2B%20commercial-5C5C68" alt="Licence AGPL-3.0 et commerciale">
   </p>
 </div>
 
 > [!IMPORTANT]
-> DuoChat provides a **local user-interface separation layer**. It does not turn one ChatGPT account into two real OpenAI accounts and it is not an unbreakable parental-control or security boundary.
+> DuoChat crée une séparation **locale de l’interface**. Il ne transforme pas un compte ChatGPT ou Claude en deux véritables comptes et ne constitue pas un contrôle parental inviolable.
 
-## Table of contents
+## Sommaire
 
-- [Why DuoChat?](#why-duochat)
-- [Features](#features)
+- [Pourquoi DuoChat ?](#pourquoi-duochat-)
+- [Fonctionnalités](#fonctionnalités)
 - [Installation](#installation)
-- [First-time setup](#first-time-setup)
-- [Usage](#usage)
-- [Existing conversations and projects](#existing-conversations-and-projects)
-- [How it works](#how-it-works)
-- [Security and privacy](#security-and-privacy)
-- [Chrome permissions](#chrome-permissions)
-- [Important limitations](#important-limitations)
-- [Development](#development)
-- [Contributing](#contributing)
-- [Troubleshooting](#troubleshooting)
-- [Roadmap](#roadmap)
-- [Licensing](#licensing)
-- [Disclaimer](#disclaimer)
+- [Première configuration](#première-configuration)
+- [Utilisation](#utilisation)
+- [Utilisation sur plusieurs ordinateurs](#utilisation-sur-plusieurs-ordinateurs)
+- [Anciennes conversations et anciens projets](#anciennes-conversations-et-anciens-projets)
+- [Fonctionnement technique](#fonctionnement-technique)
+- [Sécurité et confidentialité](#sécurité-et-confidentialité)
+- [Permissions Chrome](#permissions-chrome)
+- [Limites importantes](#limites-importantes)
+- [Développement](#développement)
+- [Contribution](#contribution)
+- [Dépannage](#dépannage)
+- [Feuille de route](#feuille-de-route)
+- [Licence](#licence)
+- [Avertissement](#avertissement)
 
-## Why DuoChat?
+## Pourquoi DuoChat ?
 
-ChatGPT does not currently provide personal sub-profiles that allow two people to share the same account while keeping two visually separated conversation histories.
+ChatGPT et Claude ne proposent pas de sous-profils locaux permettant à plusieurs personnes partageant un compte ou un navigateur de conserver des historiques visuellement séparés.
 
-DuoChat adds that organization directly in the browser:
+DuoChat ajoute cette organisation directement dans le navigateur :
 
-- **User A** only sees their own conversations and projects;
-- **User B** only sees theirs;
-- each space has its own password;
-- switching profiles requires the target profile's password;
-- no external DuoChat infrastructure is required.
+- chaque utilisateur ne voit que les conversations et projets qui lui sont attribués ;
+- chaque espace possède son propre mot de passe ;
+- le changement de profil nécessite le mot de passe du profil cible ;
+- aucune infrastructure externe n’est nécessaire.
 
-## Features
+## Fonctionnalités
 
-### Two local profiles
+### Profils locaux illimités
 
-- Two independent spaces: User A and User B.
-- Custom profile names during first-time setup.
-- A separate password for each profile.
-- Remembers the last selected profile.
-- Automatically locks after the browser session ends.
+- Deux profils sont créés lors de l’installation initiale, puis autant de profils supplémentaires que nécessaire peuvent être ajoutés.
+- Les mêmes profils fonctionnent sur `chatgpt.com` et `claude.ai`.
+- Noms personnalisables lors de la première configuration.
+- Mot de passe distinct pour chaque profil.
+- Mémorisation du dernier profil sélectionné.
+- Verrouillage automatique après la fermeture du navigateur.
 
-### Conversation separation
+### Séparation des conversations
 
-- Automatically assigns new conversations to the active profile.
-- Hides conversations belonging to the other profile.
-- Blocks direct access to a protected conversation.
-- Protects the browser tab title when locked content is opened.
+- Attribution automatique des nouvelles conversations au profil actif.
+- Masquage des conversations appartenant à l’autre profil.
+- Blocage de l’ouverture directe d’une conversation protégée.
+- Protection du titre de l’onglet lorsqu’un contenu est verrouillé.
 
-### Project separation
+### Séparation des projets
 
-- Automatically assigns new projects to the active profile.
-- Hides projects belonging to the other profile.
-- Blocks direct access to a protected project.
-- Silently assigns new conversations created inside an authorized project to the correct profile.
-- Recognizes the different project identifier formats used by ChatGPT.
+- Attribution automatique des nouveaux projets au profil actif.
+- Masquage des projets appartenant à l’autre profil.
+- Blocage de l’ouverture directe d’un projet protégé.
+- Attribution silencieuse au bon profil des nouvelles conversations créées dans un projet autorisé.
+- Reconnaissance des différents formats d’identifiants de projet utilisés par ChatGPT.
+- Prise en charge des routes de projet et de chat imbriquées utilisées par Claude.
+- Espaces de noms distincts pour empêcher toute collision entre un identifiant ChatGPT et un identifiant Claude.
 
-### Locking and recovery
+### Verrouillage et récupération
 
-- Immediate locking from the extension menu.
-- Keyboard shortcut: `Alt` + `Shift` + `L`.
-- Recovery mode for assigning items that existed before DuoChat was installed.
-- 30-second cooldown after five incorrect password attempts.
+- Verrouillage immédiat depuis le menu de l’extension.
+- Raccourci clavier `Alt` + `Maj` + `L`.
+- Mode de récupération pour attribuer les éléments créés avant l’installation.
+- Pause de 30 secondes après cinq mots de passe incorrects.
 
-### Privacy
+### Transfert entre ordinateurs sans base de données
 
-- No DuoChat server.
-- No DuoChat account.
-- No analytics or tracking.
-- No message content stored or transmitted by the extension.
-- No remotely loaded scripts.
+- Génération d’un code de transfert depuis le menu DuoChat.
+- Import du code sur un nouveau PC sans Supabase, Firebase ou serveur DuoChat.
+- Copie des profils, empreintes de mots de passe et attributions ChatGPT/Claude.
+- Fusion possible avec une installation DuoChat déjà configurée.
+- Conservation des attributions locales lorsqu’un conflit est détecté.
+
+### Respect de la vie privée
+
+- Aucun serveur DuoChat.
+- Aucun compte DuoChat.
+- Aucun outil d’analyse ou de suivi.
+- Aucun contenu de message enregistré ou transmis par l’extension.
+- Aucun script distant chargé par l’extension.
 
 ## Installation
 
-DuoChat is not yet distributed through the Chrome Web Store, so it must currently be installed in developer mode.
+DuoChat n’étant pas encore distribué sur le Chrome Web Store, l’installation s’effectue en mode développeur.
 
-1. Download the repository using **Code → Download ZIP**, or clone it with Git.
-2. Extract the archive if necessary.
-3. Open `chrome://extensions` in Chrome.
-4. Enable **Developer mode** in the top-right corner.
-5. Click **Load unpacked**.
-6. Select the folder containing `manifest.json`.
-7. Pin DuoChat from the Chrome extensions menu.
-8. Open [chatgpt.com](https://chatgpt.com/).
+1. Télécharge le dépôt avec **Code → Download ZIP**, ou clone-le avec Git.
+2. Décompresse l’archive si nécessaire.
+3. Ouvre `chrome://extensions` dans Chrome.
+4. Active **Mode développeur** en haut à droite.
+5. Clique sur **Charger l’extension non empaquetée**.
+6. Sélectionne le dossier contenant `manifest.json`.
+7. Épingle DuoChat depuis le menu des extensions.
+8. Ouvre [chatgpt.com](https://chatgpt.com/) ou [claude.ai](https://claude.ai/).
 
 > [!TIP]
-> Keep the extension folder after installation. Chrome needs it to reload the extension and apply future updates.
+> Conserve le dossier de l’extension après l’installation. Chrome en a besoin pour la recharger et appliquer les prochaines mises à jour.
 
-## First-time setup
+## Première configuration
 
-When DuoChat first runs on ChatGPT:
+Au premier lancement sur ChatGPT ou Claude :
 
-1. Choose a name for Profile A.
-2. Create its password.
-3. Choose a name for Profile B.
-4. Create its password.
-5. Select the first profile to open.
-6. Choose whether the items currently visible should be assigned to that first profile.
+1. Choisis le nom du profil A.
+2. Crée son mot de passe.
+3. Choisis le nom du profil B.
+4. Crée son mot de passe.
+5. Sélectionne le premier profil à ouvrir.
+6. Indique si les éléments actuellement visibles doivent être attribués à ce premier profil.
 
-Each password must contain at least six characters. For stronger protection, use a long and unique passphrase for each user.
+Tu peux ensuite ouvrir le menu DuoChat et choisir **Ajouter un utilisateur** autant de fois que nécessaire.
+
+Chaque mot de passe doit contenir au moins six caractères. Pour une meilleure protection, utilise une phrase de passe longue et différente pour chaque utilisateur.
 
 > [!WARNING]
-> There is no password recovery mechanism. Deleting the extension's data also resets the profiles and all local ownership assignments.
+> Il n’existe aucun mécanisme de récupération du mot de passe. Supprimer les données de l’extension réinitialise aussi les profils et toutes les attributions locales.
 
-## Usage
+## Utilisation
 
-### Create a conversation
+### Créer une conversation
 
-Open the correct profile, then create a conversation normally in ChatGPT. DuoChat automatically assigns it to the active profile.
+Ouvre le bon profil, puis crée normalement une conversation depuis ChatGPT ou Claude. DuoChat l’attribue automatiquement au profil actif.
 
-### Use a project
+### Utiliser un projet
 
-Open or create the project from the correct profile. The project and any new conversations started inside it are associated with the same user automatically.
+Ouvre ou crée le projet depuis le bon profil, sur ChatGPT comme sur Claude. Le projet et les nouvelles conversations lancées à l’intérieur sont rattachés au même utilisateur sans étape supplémentaire.
 
-### Switch users
+### Changer d’utilisateur
 
-1. Click the DuoChat icon in the Chrome toolbar.
-2. Select the other profile.
-3. Enter that profile's password.
+1. Clique sur l’icône DuoChat dans la barre d’outils de Chrome.
+2. Sélectionne l’autre profil.
+3. Saisis le mot de passe de ce profil.
 
-The ChatGPT page is immediately filtered to show the conversations and projects belonging to the selected user.
+Les onglets ChatGPT et Claude ouverts sont immédiatement filtrés avec les conversations et projets du nouvel utilisateur.
 
-### Lock the space
+### Verrouiller l’espace
 
-Use the **Lock now** button in the DuoChat menu or press `Alt` + `Shift` + `L`.
+Utilise le bouton **Verrouiller maintenant** dans le menu DuoChat ou le raccourci `Alt` + `Maj` + `L`.
 
-Extension shortcuts can be changed from `chrome://extensions/shortcuts`.
+Les raccourcis d’extensions peuvent être modifiés depuis `chrome://extensions/shortcuts`.
 
-## Existing conversations and projects
+## Utilisation sur plusieurs ordinateurs
 
-DuoChat cannot automatically determine who owns items created before the extension was installed.
+DuoChat peut transférer son espace sans aucune base de données :
 
-To classify them:
+1. Sur le premier PC, ouvre le profil actif et clique sur l’icône DuoChat.
+2. Déplie **Relier un autre ordinateur**.
+3. Clique sur **Générer**, puis sur **Copier**.
+4. Envoie le code à l’autre utilisateur par un canal privé.
+5. Sur le second PC, installe DuoChat et colle le code dans **Code de transfert DuoChat**.
+6. Clique sur **Importer les profils**.
+7. Chaque profil est alors accessible avec son propre mot de passe.
 
-1. Open the profile that should own the items.
-2. Click the DuoChat icon.
-3. Enable **Recover existing items**.
-4. Unassigned items appear with an orange outline.
-5. Click a project or conversation to assign it to the active profile.
-6. Disable recovery mode when finished.
+Le code copie un instantané de l’état au moment de sa génération. Comme aucun serveur ni aucune base de données n’est utilisé, les changements futurs ne peuvent pas apparaître automatiquement sur un PC éteint ou distant. Pour resynchroniser de nouvelles attributions, génère un nouveau code sur le PC le plus à jour et importe-le sur l’autre. L’import fusionne les nouveaux profils et éléments ; en cas de conflit, l’attribution déjà présente sur le PC destinataire est conservée.
 
-An item already assigned to the other profile cannot be recovered from the wrong space.
+> [!CAUTION]
+> Le code de transfert n’est pas un mot de passe et son contenu est seulement encodé pour le transport. Il ne contient aucun message ou cookie ChatGPT/Claude, mais il contient les noms des profils, les empreintes de leurs mots de passe et les identifiants attribués. Ne le publie jamais dans une issue GitHub.
 
-## How it works
+## Anciennes conversations et anciens projets
 
-DuoChat is a Chrome **Manifest V3** extension with no runtime dependency and no remote DuoChat service.
+DuoChat ne peut pas déterminer automatiquement le propriétaire des éléments créés avant son installation.
 
-| File | Responsibility |
+Pour les classer :
+
+1. Ouvre le profil auquel les éléments appartiennent.
+2. Clique sur l’icône DuoChat.
+3. Active **Récupérer les anciens éléments**.
+4. Les éléments sans propriétaire apparaissent avec un contour orange.
+5. Clique sur un projet ou une conversation pour l’attribuer au profil actif.
+6. Désactive ensuite le mode de récupération.
+
+Un élément déjà attribué à l’autre profil ne peut pas être récupéré depuis le mauvais espace.
+
+## Fonctionnement technique
+
+DuoChat est une extension Chrome **Manifest V3** sans dépendance d’exécution ni service distant.
+
+| Fichier | Responsabilité |
 | --- | --- |
-| `manifest.json` | Permissions, scripts, popup, icons and keyboard shortcut |
-| `background.js` | Authentication, item ownership, storage and synchronization between tabs |
-| `content.js` | Page protection, ChatGPT route detection and interface filtering |
-| `content.css` | Setup, lock screen and protection styles |
-| `popup.html` / `popup.css` / `popup.js` | DuoChat menu and profile switching |
-| `core.js` | Shared validation, identifier normalization and cryptography |
-| `tests/` | Core, manifest and static security tests |
+| `manifest.json` | Permissions, scripts, popup, icônes et raccourci clavier |
+| `background.js` | Authentification, attribution des éléments, stockage et synchronisation entre les onglets ChatGPT et Claude |
+| `content.js` | Protection de la page, détection des routes ChatGPT/Claude et filtrage de l’interface |
+| `content.css` | Écrans de configuration, verrouillage et protection |
+| `popup.html` / `popup.css` / `popup.js` | Menu DuoChat et changement de profil |
+| `core.js` | Validation, profils dynamiques, codes de transfert, espaces de noms et cryptographie partagée |
+| `tests/` | Tests du cœur, du manifeste et des règles de sécurité statiques |
 
-### Conversation lifecycle
+### Cycle d’une conversation
 
-1. The user unlocks a profile with its password.
-2. A new conversation receives the active profile identifier.
-3. The association is stored locally.
-4. Links belonging to the other profile are hidden.
-5. A direct-access attempt displays the protection screen.
+1. L’utilisateur ouvre un profil avec son mot de passe.
+2. Une nouvelle conversation reçoit l’identifiant du profil actif.
+3. L’association est conservée localement.
+4. Les liens appartenant à l’autre profil sont masqués.
+5. Une tentative d’ouverture directe affiche l’écran de protection.
 
-### Local storage
+### Stockage local
 
-| Data | Location | Retention |
+| Donnée | Emplacement | Durée |
 | --- | --- | --- |
-| Profile names | `chrome.storage.local` | Until extension data is deleted |
-| Password hashes | `chrome.storage.local` | Until extension data is deleted |
-| Conversation and project ownership | `chrome.storage.local` | Until extension data is deleted |
-| Temporarily unlocked profile | `chrome.storage.session` | Browser session |
-| Recovery mode | `chrome.storage.session` | Browser session |
+| Noms des profils | `chrome.storage.local` | Jusqu’à la suppression des données de l’extension |
+| Empreintes des mots de passe | `chrome.storage.local` | Jusqu’à la suppression des données de l’extension |
+| Propriétaires des conversations et projets | `chrome.storage.local` | Jusqu’à la suppression des données de l’extension |
+| Profil temporairement déverrouillé | `chrome.storage.session` | Session du navigateur |
+| Mode de récupération | `chrome.storage.session` | Session du navigateur |
 
-## Security and privacy
+## Sécurité et confidentialité
 
-### Password protection
+### Protection des mots de passe
 
-Passwords are never stored in plaintext. DuoChat uses:
+Les mots de passe ne sont jamais stockés en clair. DuoChat utilise :
 
-- PBKDF2 with SHA-256;
-- 310,000 iterations;
-- a random 16-byte salt unique to each profile;
-- constant-time hash comparison;
-- temporary rate limiting after repeated failures.
+- PBKDF2 avec SHA-256 ;
+- 310 000 itérations ;
+- un sel aléatoire de 16 octets différent pour chaque profil ;
+- une comparaison de taille constante des empreintes ;
+- une limitation temporaire après plusieurs échecs.
 
-### Data handled by DuoChat
+### Données manipulées
 
-The extension only stores the information required for local separation:
+DuoChat conserve uniquement les informations nécessaires à la séparation locale :
 
-- profile names;
-- cryptographic password hashes;
-- technical identifiers for conversations and projects;
-- active profile and session state.
+- noms des profils ;
+- empreintes cryptographiques des mots de passe ;
+- identifiants techniques des conversations et projets ;
+- ordre des profils et données nécessaires aux transferts manuels ;
+- profil actif et état de session.
 
-DuoChat does not store the text of messages, files uploaded to ChatGPT, or generated responses.
+L’extension ne stocke pas le texte des messages, les fichiers envoyés à ChatGPT ou Claude, ni les réponses générées.
 
-## Chrome permissions
+## Permissions Chrome
 
-| Permission | Purpose |
+| Permission | Utilisation |
 | --- | --- |
-| `storage` | Store profiles, password hashes and ownership assignments locally |
-| `tabs` | Refresh protection in open ChatGPT tabs after a profile switch |
-| `https://chatgpt.com/*` | Run the filtering logic only on ChatGPT |
+| `storage` | Enregistrer localement les profils, empreintes et attributions |
+| `tabs` | Actualiser la protection dans les onglets ChatGPT et Claude ouverts après un changement de profil |
+| `https://chatgpt.com/*` | Exécuter le filtrage uniquement sur le site ChatGPT |
+| `https://claude.ai/*` | Exécuter le filtrage uniquement sur le site Claude |
 
-DuoChat does not request access to global Chrome browsing history, downloads, the clipboard, camera or microphone.
+DuoChat ne demande aucun accès à l’historique global de Chrome, aux téléchargements, au presse-papiers, à la caméra ou au microphone.
 
-## Important limitations
+## Limites importantes
 
-DuoChat provides a convenient separation layer for trusted people sharing a browser. It is not a strong security boundary.
+DuoChat fournit une séparation pratique pour des personnes de confiance partageant un navigateur. Ce n’est pas une frontière de sécurité forte.
 
-- Both profiles still use the same OpenAI account and subscription.
-- Usage limits, account settings, billing and product features remain shared.
-- ChatGPT-managed memory and personalization are not separated by DuoChat.
-- Someone with access to Chrome can disable the extension, clear its storage, or open the account in another browser or device.
-- Browser developer tools may allow an advanced user to bypass a local-only protection layer.
-- Changes to ChatGPT's interface or routes may require DuoChat updates.
+- Sur chaque service, les deux profils utilisent toujours le même compte et le même abonnement ChatGPT ou Claude.
+- Les limites d’utilisation, paramètres du compte, facturation et fonctionnalités restent partagés.
+- La mémoire et la personnalisation gérées par ChatGPT ou Claude ne sont pas séparées par DuoChat.
+- Une personne ayant accès à Chrome peut désactiver l’extension, effacer son stockage ou ouvrir le compte depuis un autre navigateur ou appareil.
+- Le code de transfert est un instantané manuel, pas une synchronisation automatique en temps réel.
+- Les outils de développement du navigateur permettent à un utilisateur avancé de contourner une protection locale.
+- Une modification de l’interface ou des routes de ChatGPT ou Claude peut nécessiter une mise à jour de DuoChat.
 
-For true isolation, use two separate OpenAI accounts or two separate Chrome profiles with independent ChatGPT sessions.
+Pour une isolation réelle, utilise des comptes distincts ou deux profils Chrome séparés possédant chacun leurs propres sessions ChatGPT et Claude.
 
-## Development
+## Développement
 
-### Requirements
+### Prérequis
 
-- Chrome or another Chromium browser compatible with Manifest V3;
-- Node.js 20 or newer to run the tests;
-- no dependency installation required.
+- Chrome ou un navigateur Chromium compatible avec Manifest V3 ;
+- Node.js 20 ou plus récent pour exécuter les tests ;
+- aucune installation de dépendance nécessaire.
 
-### Run checks
+### Lancer les vérifications
 
 ```bash
 npm test
 npm run check
 ```
 
-The current test suite checks, among other things:
+La suite actuelle vérifie notamment :
 
-- conversation identifier extraction;
-- normalization of different project identifier formats;
-- project recognition when opening a chat;
-- password hashing and verification;
-- ownership migration and validation;
-- manifest validity;
-- presence of declared files;
-- absence of `eval` and remotely loaded scripts.
+- l’extraction des identifiants de conversations ;
+- la normalisation des différents formats d’identifiants de projets ;
+- l’isolation des identifiants entre ChatGPT et Claude ;
+- la migration automatique des anciennes attributions ChatGPT ;
+- la gestion d’un nombre dynamique de profils ;
+- l’export, l’import et la fusion des codes de transfert ;
+- la reconnaissance d’un projet lors de l’ouverture d’un chat ;
+- le hachage et la vérification des mots de passe ;
+- la migration et la validation des propriétaires ;
+- la validité du manifeste ;
+- la présence des fichiers déclarés ;
+- l’absence d’`eval` et de chargements distants dans les scripts.
 
-### Reload the extension during development
+### Recharger l’extension pendant le développement
 
-1. Modify the files.
-2. Open `chrome://extensions`.
-3. Click **Reload** on the DuoChat card.
-4. Refresh any open ChatGPT tabs.
+1. Modifie les fichiers.
+2. Ouvre `chrome://extensions`.
+3. Clique sur **Actualiser** sur la carte DuoChat.
+4. Recharge les onglets ChatGPT et Claude ouverts.
 
-## Contributing
+## Contribution
 
-Bug fixes, improvements and compatibility reports are welcome.
+Les corrections, améliorations et retours de compatibilité sont les bienvenus.
 
-1. Fork the repository.
-2. Create a dedicated branch:
+1. Forke le dépôt.
+2. Crée une branche dédiée :
 
    ```bash
-   git checkout -b fix/short-description
+   git checkout -b fix/description-courte
    ```
 
-3. Make a focused change.
-4. Run `npm run check`.
-5. Clearly describe the problem being solved and the expected behavior.
-6. Open a pull request.
+3. Effectue une modification ciblée.
+4. Exécute `npm run check`.
+5. Décris clairement le problème résolu et le comportement attendu.
+6. Ouvre une pull request.
 
-When reporting a bug, include when possible:
+Pour signaler un bug, indique si possible :
 
-- DuoChat version;
-- Chrome version;
-- exact reproduction steps;
-- actual and expected behavior;
-- a screenshot without personal data;
-- errors shown in the extension console.
+- la version de DuoChat ;
+- la version de Chrome ;
+- les étapes exactes pour reproduire le problème ;
+- le résultat obtenu et le résultat attendu ;
+- une capture d’écran sans donnée personnelle ;
+- les erreurs visibles dans la console de l’extension.
 
-Never publish passwords, private conversation content, session cookies or authentication identifiers in an issue.
+Ne publie jamais de mot de passe, de contenu privé, de cookie de session ou d’identifiant d’authentification dans une issue.
 
 > [!NOTE]
-> To preserve the project's ability to use dual licensing, significant contributions may require a separate Contributor License Agreement (CLA) before they are merged.
+> Afin de préserver la possibilité d’une double licence, une contribution importante pourra nécessiter un accord de contribution distinct avant son intégration.
 
-## Troubleshooting
+## Dépannage
 
-### "Unassigned project" appears whenever a new chat is created
+### « Projet non attribué » apparaît à chaque nouveau chat
 
-Install DuoChat `1.1.1` or later. This version normalizes the two project identifier formats ChatGPT may use for the same project.
+Installe DuoChat `1.1.1` ou une version plus récente. Cette version normalise les deux formats d’identifiant que ChatGPT peut utiliser pour un même projet. La version `1.2.0` ajoute Claude, la version `1.3.0` ajoute les profils illimités et les transferts entre PC, et la version `1.3.1` améliore le popup ainsi que ses états de survol en thème sombre.
 
-### An existing conversation or project disappeared
+### Une ancienne conversation ou un ancien projet a disparu
 
-The item is probably still unassigned. Enable **Recover existing items** from the correct profile, then select the item.
+L’élément est probablement encore sans propriétaire. Active **Récupérer les anciens éléments** depuis le bon profil, puis sélectionne-le.
 
-### The other profile cannot see any conversations
+### L’autre profil ne voit aucune conversation
 
-Existing items may have been assigned to the first profile during setup. Use recovery mode only for items that are still unassigned. A future management tool is planned to explicitly transfer an already assigned item.
+Les éléments existants ont peut-être été attribués au premier profil pendant la configuration. Utilise le mode de récupération uniquement pour les éléments encore non attribués. Un futur outil de gestion permettra de transférer explicitement un élément déjà attribué.
 
-### ChatGPT stays locked after switching profiles
+### ChatGPT ou Claude reste verrouillé après un changement de profil
 
-Refresh the tab with `Ctrl` + `R`. Then check `chrome://extensions` to make sure DuoChat is enabled and up to date.
+Recharge l’onglet avec `Ctrl` + `R`. Vérifie ensuite sur `chrome://extensions` que DuoChat est activé et à jour.
 
-### The keyboard shortcut does not work
+### Le raccourci clavier ne fonctionne pas
 
-Open `chrome://extensions/shortcuts` and verify that the DuoChat shortcut does not conflict with another extension.
+Ouvre `chrome://extensions/shortcuts`, puis vérifie que le raccourci de DuoChat n’entre pas en conflit avec une autre extension.
 
-### Filtering stopped working after a ChatGPT update
+### Le filtrage ne fonctionne plus après une mise à jour de ChatGPT ou Claude
 
-Selectors and routes in a web application may change. Open an issue with reproduction steps, your Chrome version and an anonymized screenshot.
+Les sélecteurs et routes d’une application web peuvent évoluer. Ouvre une issue avec les étapes de reproduction, la version de Chrome et une capture d’écran anonymisée.
 
-## Roadmap
+## Feuille de route
 
-- Transfer conversations or projects between profiles.
-- Change profile names and passwords after setup.
-- Configurable automatic lock delay.
-- Encrypted export and import of local ownership assignments.
-- Automated end-to-end tests against the ChatGPT interface.
-- Verified compatibility with additional Chromium browsers.
-- Preparation for a Chrome Web Store release.
+- Gestion permettant de transférer une conversation ou un projet entre profils.
+- Modification des noms et mots de passe après la configuration.
+- Délai de verrouillage automatique configurable.
+- Synchronisation pair-à-pair en temps réel lorsqu’au moins deux appareils sont connectés.
+- Tests automatisés de bout en bout sur les interfaces ChatGPT et Claude.
+- Compatibilité vérifiée avec d’autres navigateurs Chromium.
+- Préparation d’une publication sur le Chrome Web Store.
 
-Suggestions are welcome in the repository issues.
+Les propositions sont les bienvenues dans les issues du dépôt.
 
-## Licensing
+## Licence
 
-DuoChat uses a **dual-license model**:
+DuoChat adopte un modèle de **double licence** :
 
-1. **GNU Affero General Public License v3.0 (AGPL-3.0)** for anyone who wants to use, study, modify, distribute or commercially use the project while complying with the AGPL-3.0 requirements.
-2. A **separate commercial license** for individuals or organizations that want to distribute, integrate or modify DuoChat under proprietary terms without being bound by the AGPL-3.0 copyleft requirements.
+1. **GNU AGPL v3** pour l’utilisation, l’étude, la modification et la redistribution du projet dans le respect des obligations de cette licence.
+2. **Licence commerciale séparée** pour les personnes ou organisations souhaitant intégrer, modifier ou redistribuer DuoChat sans appliquer les obligations de l’AGPL à leur solution propriétaire.
 
-The commercial license currently uses a **15% royalty on Net Commercial Revenue** attributable to a proprietary commercial product that includes or is derived from DuoChat, unless a separate written agreement states otherwise.
+Les conditions commerciales, y compris une éventuelle redevance ou un partage de revenus, sont définies dans un accord séparé avec le propriétaire du dépôt.
 
-See [`COMMERCIAL_LICENSE.md`](./COMMERCIAL_LICENSE.md) for the commercial terms.
+> [!NOTE]
+> Une licence open source autorise également l’usage commercial lorsqu’il respecte ses conditions. Exiger systématiquement un pourcentage sur toute revente nécessite une licence commerciale personnalisée et ne relève pas, à elle seule, d’une licence open source approuvée par l’OSI.
 
-> [!IMPORTANT]
-> The AGPL-3.0 itself allows commercial use and commercial redistribution. A person or company that fully complies with the AGPL-3.0 may commercially use or sell DuoChat without purchasing the separate commercial license or paying the commercial-license royalty. The commercial license is an alternative for proprietary use.
+Consulte le [texte complet de la GNU AGPL v3](https://www.gnu.org/licenses/agpl-3.0.html) pour les conditions open source. Pour demander une licence commerciale, contacte le propriétaire du dépôt via son profil GitHub.
 
-See the [full GNU AGPL v3 text](https://www.gnu.org/licenses/agpl-3.0.html) for the open-source terms.
+## Avertissement
 
-For a commercial license, contact the repository owner through GitHub or the contact address listed in `COMMERCIAL_LICENSE.md`.
+DuoChat est un projet indépendant et non officiel. Il n’est affilié ni à OpenAI ni à Anthropic, et n’est approuvé ou sponsorisé par aucune de ces sociétés.
 
-## Disclaimer
-
-DuoChat is an independent and unofficial project. It is not affiliated with, endorsed by, or sponsored by OpenAI.
-
-"OpenAI", "ChatGPT", and related marks belong to their respective owners. Use of DuoChat remains subject to the applicable ChatGPT and OpenAI terms.
+« OpenAI », « ChatGPT », « Anthropic », « Claude » et les marques associées appartiennent à leurs propriétaires respectifs. L’utilisation de DuoChat reste soumise aux conditions applicables de chaque service.
 
 ---
 
 <div align="center">
   <strong>DuoChat</strong><br>
-  A simple local separation layer for sharing a ChatGPT session more cleanly.
+  Une séparation locale simple pour partager plus proprement ChatGPT et Claude.
 </div>

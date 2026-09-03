@@ -4,6 +4,9 @@ document.documentElement.classList.add("duochat-pending");
 
 (function runDuoChatGuard() {
   const C = globalThis.DuoChatCore;
+  const currentSite = C.getSupportedSite(location.href);
+  const siteName = currentSite ? currentSite.name : "ce service";
+  const homeUrl = currentSite ? currentSite.homeUrl : location.origin;
   let snapshot = null;
   let currentUrl = location.href;
   let previousConversationId = C.extractConversationId(currentUrl);
@@ -51,7 +54,7 @@ document.documentElement.classList.add("duochat-pending");
     panel.innerHTML = `
       <div class="duochat-brand">
         <div class="duochat-logo">${iconMarkup()}</div>
-        <div class="duochat-brand-copy"><strong>DuoChat</strong><span>Deux espaces sur ce navigateur</span></div>
+        <div class="duochat-brand-copy"><strong>DuoChat</strong><span>Profils locaux protégés</span></div>
       </div>
       <h1></h1>
       <p class="duochat-lead"></p>
@@ -126,7 +129,7 @@ document.documentElement.classList.add("duochat-pending");
     document.documentElement.classList.add("duochat-pending");
     shieldBrowserTitle("DuoChat — Configuration");
     const panel = gateShell(
-      "Créer les deux espaces",
+      "Créer les premiers profils",
       "Chaque profil possède son propre mot de passe et ne voit que les discussions et projets qui lui sont attribués."
     );
     const form = document.createElement("form");
@@ -153,7 +156,7 @@ document.documentElement.classList.add("duochat-pending");
       </div>
       <label class="duochat-check"><input name="importVisible" type="checkbox" checked><span>Attribuer les discussions et projets actuellement visibles dans la barre latérale au premier profil.</span></label>
       <p class="duochat-error" role="alert" aria-live="polite"></p>
-      <button class="duochat-button duochat-button-primary" type="submit">Créer les deux espaces</button>
+      <button class="duochat-button duochat-button-primary" type="submit">Créer les profils</button>
     `;
     panel.appendChild(form);
     let firstProfileId = "A";
@@ -209,7 +212,7 @@ document.documentElement.classList.add("duochat-pending");
       } catch (setupError) {
         error.textContent = friendlyError(setupError.message);
         submit.disabled = false;
-        submit.textContent = "Créer les deux espaces";
+        submit.textContent = "Créer les profils";
       }
     });
     requestAnimationFrame(() => form.elements.passwordA.focus());
@@ -218,7 +221,7 @@ document.documentElement.classList.add("duochat-pending");
   function showLogin(preselectedId) {
     document.documentElement.classList.add("duochat-pending");
     shieldBrowserTitle("DuoChat — Verrouillé");
-    const panel = gateShell("Qui utilise ChatGPT ?", "Choisis ton espace puis saisis son mot de passe.");
+    const panel = gateShell(`Qui utilise ${siteName} ?`, "Choisis ton espace puis saisis son mot de passe.");
     const form = document.createElement("form");
     form.className = "duochat-form";
     form.innerHTML = `
@@ -231,7 +234,7 @@ document.documentElement.classList.add("duochat-pending");
     panel.appendChild(form);
     const list = form.querySelector(".duochat-profile-list");
     let selectedId = C.isValidProfileId(preselectedId) ? preselectedId : snapshot.activeProfileId || "A";
-    for (const id of C.PROFILE_IDS) {
+    for (const id of snapshot.profileOrder) {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "duochat-profile-choice";
@@ -287,7 +290,7 @@ document.documentElement.classList.add("duochat-pending");
     const back = document.createElement("button");
     back.className = "duochat-button duochat-button-primary";
     back.textContent = "Retour à l’accueil";
-    back.addEventListener("click", () => location.assign("https://chatgpt.com/"));
+    back.addEventListener("click", () => location.assign(homeUrl));
     const change = document.createElement("button");
     change.className = "duochat-button duochat-button-secondary";
     change.textContent = `Se connecter comme ${ownerName}`;
@@ -330,7 +333,7 @@ document.documentElement.classList.add("duochat-pending");
     const back = document.createElement("button");
     back.className = "duochat-button duochat-button-secondary";
     back.textContent = "Ne pas ouvrir";
-    back.addEventListener("click", () => location.assign("https://chatgpt.com/"));
+    back.addEventListener("click", () => location.assign(homeUrl));
     actions.append(claim, back);
     panel.append(error, actions);
   }

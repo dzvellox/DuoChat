@@ -39,7 +39,7 @@ async function writeSession(session) {
 
 function publicSnapshot(state, session) {
   const profiles = {};
-  for (const id of C.PROFILE_IDS) {
+  for (const id of state.profileOrder) {
     if (state.profiles[id]) profiles[id] = { id, name: state.profiles[id].name };
   }
   const unlocked = Boolean(
@@ -51,6 +51,7 @@ function publicSnapshot(state, session) {
     configured: state.configured,
     activeProfileId: state.activeProfileId,
     profiles,
+    profileOrder: state.profileOrder,
     conversationOwners: state.conversationOwners,
     projectOwners: state.projectOwners,
     unlocked,
@@ -64,7 +65,11 @@ async function getSnapshot() {
 }
 
 async function broadcastRefresh() {
-  const tabs = await chrome.tabs.query({ url: "https://chatgpt.com/*" });
+  const tabGroups = await Promise.all([
+    chrome.tabs.query({ url: "https://chatgpt.com/*" }),
+    chrome.tabs.query({ url: "https://claude.ai/*" })
+  ]);
+  const tabs = [...new Map(tabGroups.flat().map((tab) => [tab.id, tab])).values()];
   await Promise.allSettled(
     tabs.map((tab) => chrome.tabs.sendMessage(tab.id, { type: "DUOCHAT_REFRESH" }))
   );
@@ -93,7 +98,7 @@ async function configure(message) {
       if (id) projectOwners[id] = firstProfileId;
     }
     const state = {
-      version: 3,
+      version: 5,
       configured: true,
       activeProfileId: firstProfileId,
       profiles: {
@@ -108,6 +113,7 @@ async function configure(message) {
           credential: credentialB
         }
       },
+      profileOrder: ["A", "B"],
       conversationOwners: owners,
       projectOwners
     };
@@ -120,6 +126,69 @@ async function configure(message) {
     });
     await broadcastRefresh();
     return publicSnapshot(state, await readSession());
+  });
+}
+
+async function addProfile(message) {
+  return serialized(async () => {
+    const [state, session] = await Promise.all([readState(), readSession()]);
+    if (!state.configured || session.unlockedProfileId !== state.activeProfileId) {
+      throw new Error("LOCKED");
+    }
+    if (!C.isValidPassword(message.password)) throw new Error("PASSWORD_TOO_SHORT");
+    const name = C.sanitizeName(message.name, `Utilisateur ${state.profileOrder.length + 1}`);
+    const duplicate = state.profileOrder.some(
+      (id) => state.profiles[id].name.localeCompare(name, undefined, { sensitivity: "accent" }) === 0
+    );
+    if (duplicate) throw new Error("PROFILE_NAME_ALREADY_EXISTS");
+    const id = C.createProfileId(state.profiles);
+    state.profiles[id] = {
+      id,
+      name,
+      credential: await C.createCredential(message.password)
+    };
+    state.profileOrder.push(id);
+    await writeState(state);
+    await broadcastRefresh();
+    return publicSnapshot(state, session);
+  });
+}
+
+async function exportTransferCode() {
+  return serialized(async () => {
+    const [state, session] = await Promise.all([readState(), readSession()]);
+    if (!state.configured || session.unlockedProfileId !== state.activeProfileId) {
+      throw new Error("LOCKED");
+    }
+    return { code: C.stateToTransferCode(state) };
+  });
+}
+
+async function importTransferCode(message) {
+  return serialized(async () => {
+    const [current, session] = await Promise.all([readState(), readSession()]);
+    if (current.configured && session.unlockedProfileId !== current.activeProfileId) {
+      throw new Error("LOCKED");
+    }
+    const imported = C.transferCodeToState(message.code);
+    const result = C.mergeStates(current, imported);
+    await writeState(result.state);
+    const nextSession = current.configured
+      ? session
+      : {
+          unlockedProfileId: null,
+          recoveryMode: false,
+          failedAttempts: 0,
+          blockedUntil: 0
+        };
+    await writeSession(nextSession);
+    await broadcastRefresh();
+    return {
+      snapshot: publicSnapshot(result.state, nextSession),
+      importedProfiles: result.importedProfiles,
+      importedEntities: result.importedEntities,
+      conflicts: result.conflicts
+    };
   });
 }
 
@@ -248,6 +317,12 @@ async function handleMessage(message) {
       return getSnapshot();
     case "CONFIGURE":
       return configure(message);
+    case "ADD_PROFILE":
+      return addProfile(message);
+    case "EXPORT_TRANSFER_CODE":
+      return exportTransferCode();
+    case "IMPORT_TRANSFER_CODE":
+      return importTransferCode(message);
     case "UNLOCK":
       return unlock(message);
     case "LOCK":
