@@ -6,7 +6,7 @@
   const BACKUPS_KEY = "duochatBackups";
   const LANGUAGE_KEY = "duochatLanguage";
   const STATE_VERSION = 8;
-  const PBKDF2_ITERATIONS = 310000;
+  const PBKDF2_ITERATIONS = 600000;
   const MIN_PASSWORD_LENGTH = 6;
   const TRANSFER_CODE_PREFIX = "DUOCHAT2.";
   const LEGACY_TRANSFER_CODE_PREFIX = "DUOCHAT1.";
@@ -135,6 +135,38 @@
   function sanitizeColor(value, fallback = "#7667F5") {
     const candidate = String(value || "").trim();
     return /^#[0-9a-fA-F]{6}$/.test(candidate) ? candidate.toUpperCase() : fallback;
+  }
+
+  function normalizeDomain(value) {
+    let candidate = String(value || "").trim().toLowerCase().replace(/^\*\./, "");
+    if (!candidate) return "";
+    try {
+      if (candidate.includes("://")) candidate = new URL(candidate).hostname.toLowerCase();
+    } catch (_error) { return ""; }
+    candidate = candidate.replace(/\.$/, "");
+    if (candidate.length > 253 || !candidate.includes(".")) return "";
+    if (!/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(candidate)) return "";
+    return candidate;
+  }
+
+  function sanitizeEntityUrl(value, kind = null, expectedId = null) {
+    try {
+      const url = new URL(String(value || ""));
+      if (url.protocol !== "https:") return "";
+      const site = getSupportedSite(url.href);
+      if (!site) return "";
+      url.username = "";
+      url.password = "";
+      url.hash = "";
+      if (kind === "conversation" || kind === "project") {
+        const extracted = kind === "conversation" ? extractConversationId(url.href) : extractProjectId(url.href);
+        if (!extracted) return "";
+        if (expectedId && extracted !== expectedId) return "";
+      }
+      return url.href.slice(0, 500);
+    } catch (_error) {
+      return "";
+    }
   }
 
   function isValidProfileId(value) {
@@ -483,7 +515,7 @@
         createdAt: Number.isFinite(rawMeta.createdAt) ? Number(rawMeta.createdAt) : null,
         lastSeenAt: Number.isFinite(rawMeta.lastSeenAt) ? Number(rawMeta.lastSeenAt) : null,
         updatedAt: Number.isFinite(rawMeta.updatedAt) ? Number(rawMeta.updatedAt) : null,
-        url: sanitizeText(rawMeta.url, 500),
+        url: sanitizeEntityUrl(rawMeta.url, kind, id),
         ownerId: owners[id] || null
       };
     }
@@ -508,7 +540,7 @@
         ? [...new Set(raw.hiddenFunctions.map((item) => sanitizeText(item, 48)).filter(Boolean))]
         : [...template.hiddenFunctions];
       const whitelist = Array.isArray(raw.externalDomains)
-        ? [...new Set(raw.externalDomains.map((item) => String(item || "").trim().toLowerCase()).filter(Boolean))].slice(0, 100)
+        ? [...new Set(raw.externalDomains.map(normalizeDomain).filter(Boolean))].slice(0, 100)
         : [...DEFAULT_WHITELIST];
       output[id] = {
         language: ["fr", "en", "es", "de", "it", "pt"].includes(String(raw.language || "").toLowerCase()) ? String(raw.language).toLowerCase() : null,
@@ -780,9 +812,10 @@
   function isDomainAllowed(url, allowedDomains) {
     try {
       const parsed = new URL(String(url));
+      if (parsed.protocol !== "https:") return false;
       const host = parsed.hostname.toLowerCase();
       return (allowedDomains || []).some((rawDomain) => {
-        const domain = String(rawDomain || "").trim().toLowerCase().replace(/^\*\./, "");
+        const domain = normalizeDomain(rawDomain);
         return domain && (host === domain || host.endsWith(`.${domain}`));
       });
     } catch (_error) {
@@ -832,6 +865,8 @@
     sanitizeText,
     sanitizeTag,
     sanitizeColor,
+    normalizeDomain,
+    sanitizeEntityUrl,
     isValidProfileId,
     isValidPassword,
     createProfileId,

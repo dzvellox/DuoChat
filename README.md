@@ -1,11 +1,11 @@
 <div align="center">
   <img src="./icons/icon-128.png" width="104" height="104" alt="DuoChat logo">
-  <h1>DuoChat 1.5.0</h1>
+  <h1>DuoChat 1.5.2</h1>
   <p><strong>Private, local profiles for sharing one ChatGPT or Claude session without mixing conversations, projects, and personal organization.</strong></p>
   <p>
-    <img src="https://img.shields.io/badge/version-1.5.0-6558E8" alt="Version 1.5.0">
+    <img src="https://img.shields.io/badge/version-1.5.2-6558E8" alt="Version 1.5.2">
     <img src="https://img.shields.io/badge/Chrome-Manifest%20V3-4285F4?logo=googlechrome&logoColor=white" alt="Chrome Manifest V3">
-    <img src="https://img.shields.io/badge/tests-29%20passed-13866F" alt="29 tests passed">
+    <img src="https://img.shields.io/badge/tests-36%20passed-13866F" alt="36 tests passed">
     <img src="https://img.shields.io/badge/storage-local%20only-2C8C76" alt="Local-only storage">
     <img src="https://img.shields.io/badge/license-AGPL--3.0%20%2B%20commercial-5C5C68" alt="AGPL-3.0 and commercial license">
   </p>
@@ -18,7 +18,7 @@
 
 DuoChat lets multiple people or contexts — Personal, Work, Study, Development, Guest, Child, and more — share the same ChatGPT or Claude session while keeping their local workspace separated.
 
-Version **1.5.0** is a major upgrade over 1.3.1. It turns DuoChat into a full local profile manager with profile locking, encrypted local storage, automatic assignment rules, a dashboard, per-profile favorites and metadata, direct-URL protection, backups, encrypted transfer, WebAuthn support, temporary profiles, permissions, privacy modes, and real-time synchronization across tabs and windows.
+Version **1.5.2** is a major upgrade over 1.3.1. It turns DuoChat into a full local profile manager with profile locking, encrypted local storage, automatic assignment rules, a dashboard, per-profile favorites and metadata, direct-URL protection, backups, encrypted transfer, WebAuthn support, temporary profiles, permissions, privacy modes, and real-time synchronization across tabs and windows.
 
 ## What's new since 1.3.1
 
@@ -58,6 +58,48 @@ Version **1.5.0** is a major upgrade over 1.3.1. It turns DuoChat into a full lo
 - Local QR transfer, including encrypted multi-part QR transfer.
 - Local statistics and cleanup tools.
 - 29 automated checks passing.
+
+
+## GitHub updates for unpacked installations
+
+DuoChat 1.5.2 adds a built-in GitHub update center designed for people who install the extension with **Load unpacked** instead of using the Chrome Web Store.
+
+- DuoChat checks `dzvellox/DuoChat` releases directly through the GitHub API.
+- Stable and Beta channels are supported.
+- A small `UPD` badge appears when a newer release is available.
+- The popup and Dashboard can check manually at any time.
+- The update ZIP can be downloaded directly from the GitHub release asset.
+- No DuoChat backend, account, analytics service, or payment service is required.
+
+Chrome intentionally does **not** allow an unpacked extension to silently replace its own installed files. After downloading an update, extract the new ZIP **over the same DuoChat folder** and click **Reload** on `chrome://extensions`. Keeping the same folder is recommended so the unpacked installation keeps the same local identity and `chrome.storage` data.
+
+> The public update checker is intended for a **public GitHub repository**. A private repository cannot be queried anonymously by end users without giving the extension a GitHub credential, which DuoChat deliberately does not do.
+
+## Support DuoChat
+
+DuoChat is free, local, and serverless. If the project is useful to you, you can support its development through **GitHub Sponsors** using the **🍪 Buy me a cookie** button in the popup or Dashboard.
+
+No payment token, API key, card data, or donation credential is embedded in DuoChat. The extension only opens the public GitHub Sponsors page for `dzvellox`. The support destination is validated before opening; because DuoChat is open source, this is tamper-evidence and defense-in-depth rather than a secret that cannot be changed by a fork author.
+
+The repository also includes `.github/FUNDING.yml`, so GitHub can surface the Sponsor button once GitHub Sponsors is enabled for the account.
+
+## Security hardening in 1.5.2
+
+Version 1.5.2 includes an additional security pass focused on the boundary between the extension and the ChatGPT/Claude page:
+
+- PINs and passwords requested by the page guard are now entered on a dedicated `chrome-extension://` authentication page instead of inside the ChatGPT/Claude DOM.
+- Messages from content scripts are allowlisted; privileged profile/authentication operations are reserved for extension-origin pages.
+- Content-script snapshots no longer reveal the full profile list or the identity of a foreign owner.
+- PBKDF2-HMAC-SHA-256 uses 600,000 iterations for newly created credentials, vault wrapping, and encrypted portable exports. Existing records retain their stored iteration count for compatibility.
+- Conversation/project URLs are strictly validated as HTTPS URLs belonging to supported ChatGPT/Claude entity routes before they can be stored or reopened.
+- External-link allowlists require valid HTTPS domains.
+- The extension pages use an explicit Content Security Policy and do not execute remote code.
+- General `github.com` host permission was removed; only the GitHub API permission needed for release checks remains.
+- The Windows updater validates the exact release asset name, GitHub host/path, SHA-256 release digest, ZIP paths, Manifest V3 identity, required files, and release/manifest version consistency before replacing files.
+- Per-profile authentication failures use escalating local cooldowns.
+- Dashboard links are sanitized again immediately before being rendered.
+
+For vulnerability reports, see `SECURITY.md`.
 
 ## Features
 
@@ -314,7 +356,7 @@ After updating the source files, reload DuoChat from `chrome://extensions`, then
 - `tabs` — propagate profile/lock changes to relevant open tabs;
 - `idle` — detect system idle/locked state when available;
 - `alarms` — local maintenance, auto-lock, and temporary-profile expiration;
-- host access is limited to `https://chatgpt.com/*` and `https://claude.ai/*`.
+- host access is limited to `https://chatgpt.com/*`, `https://claude.ai/*`, and `https://api.github.com/*` for release checks. DuoChat does not request general `github.com` host access.
 
 DuoChat does not request access to every website you visit.
 
@@ -339,7 +381,7 @@ The validation suite includes:
 - encrypted QR transfer checks;
 - checks preventing `eval` and remote script execution.
 
-Current v1.5.0 validation status: **29 tests passed out of 29**.
+Current v1.5.2 validation status: **36 tests passed out of 36**.
 
 > [!NOTE]
 > Automated tests cannot emulate a real Windows Hello, Touch ID, or FIDO2 authenticator. WebAuthn integration is therefore checked programmatically and should also be manually tested in Chrome with real hardware before production publication.
@@ -361,7 +403,7 @@ Important limitations:
 
 ## Privacy
 
-DuoChat 1.5.0 does not require a DuoChat backend:
+DuoChat 1.5.2 does not require a DuoChat backend:
 
 - no remote DuoChat account;
 - no Supabase or Firebase database;
@@ -378,6 +420,31 @@ The repository uses the **GNU AGPL v3** for open-source use, with a separate com
 The bundled QR component keeps its own license notice in `vendor/QR-LICENSE.txt`.
 
 ## Changelog
+
+### 1.5.2
+
+- Added GitHub Sponsors support buttons to the popup and Dashboard.
+- Added `.github/FUNDING.yml` for GitHub-native project sponsorship.
+- Moved page-guard PIN/password entry to a dedicated extension-origin secure authentication page.
+- Added sender-context allowlisting and redacted content-script snapshots.
+- Raised PBKDF2 iterations for new credentials and encrypted exports to 600,000.
+- Added strict ChatGPT/Claude entity URL validation and HTTPS-only external-link allowlists.
+- Added explicit extension-page CSP and removed unnecessary `github.com` host permission.
+- Hardened the Windows updater with SHA-256 verification and ZIP path-traversal protections.
+- Added support-link integrity checks without embedding any payment token or API secret.
+- Updated the commercial-license public identity to `dzvellox` and contact to `zvellox@gmail.com`.
+- Expanded the automated suite to **36/36 passing tests**.
+
+### 1.5.1
+
+- Added built-in GitHub release update checks for unpacked installations.
+- Added Stable and Beta update channels.
+- Added automatic update checks every six hours and an `UPD` extension badge.
+- Added update controls to the popup and Dashboard.
+- Added direct release ZIP download from GitHub.
+- Added an optional Windows PowerShell updater helper for overwriting the same unpacked folder.
+- Added update documentation and token-free updater validation.
+- Expanded the automated suite to 30/30 passing tests.
 
 ### 1.5.0
 

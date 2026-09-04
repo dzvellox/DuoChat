@@ -2,17 +2,19 @@
   "manifest_version": 3,
   "name": "__MSG_extName__",
   "short_name": "DuoChat",
-  "version": "1.5.0",
+  "version": "1.5.2",
   "description": "__MSG_extDescription__",
   "permissions": [
     "storage",
     "tabs",
     "idle",
-    "alarms"
+    "alarms",
+    "downloads"
   ],
   "host_permissions": [
     "https://chatgpt.com/*",
-    "https://claude.ai/*"
+    "https://claude.ai/*",
+    "https://api.github.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -81,5 +83,8 @@
     }
   },
   "default_locale": "fr",
-  "minimum_chrome_version": "102"
+  "minimum_chrome_version": "102",
+  "content_security_policy": {
+    "extension_pages": "default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; connect-src https://api.github.com; img-src 'self' data:; style-src 'self' 'unsafe-inline'; form-action 'none'"
+  }
 }

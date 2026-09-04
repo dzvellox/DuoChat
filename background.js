@@ -6,6 +6,162 @@ const C = self.DuoChatCore;
 const I = self.DuoChatI18n;
 let operationQueue = Promise.resolve();
 
+const SECURE_REQUESTS_KEY = "__duochat_secure_requests_v1";
+const FOREIGN_OWNER = "__duochat_foreign__";
+const EXTENSION_ORIGIN_PREFIX = chrome.runtime.getURL("");
+const SUPPORT_LINK_B64_PARTS = Object.freeze([
+  "aHR0cHM6Ly9naXRodWIuY29tL3Nw",
+  "b25zb3JzL2R6dmVsbG94"
+]);
+const SUPPORT_LINK_SHA256_PARTS = Object.freeze([
+  "75b4b185d3357dcb",
+  "b5c1ad598e138a9a",
+  "82e0865bf4c65fb8",
+  "cf8cb7c793eed0c7"
+]);
+
+function senderContext(sender) {
+  if (!sender || sender.id !== chrome.runtime.id) return "unauthorized";
+  const senderUrl = String(sender.url || "");
+  if (senderUrl.startsWith(EXTENSION_ORIGIN_PREFIX)) return "extension";
+  if (C.getSupportedSite(senderUrl)) return "content";
+  return "unknown";
+}
+
+const CONTENT_ALLOWED_MESSAGES = new Set([
+  "GET_SNAPSHOT", "GET_LANGUAGE", "SET_LANGUAGE", "LOCK", "LOGICAL_LOGOUT", "PANIC_LOCK",
+  "CLAIM_CONVERSATION", "CLAIM_CONVERSATIONS", "CLAIM_PROJECT", "CLAIM_PROJECTS",
+  "CLAIM_PROJECT_WITH_CONVERSATIONS", "AUTO_ASSIGN_ENTITY", "RECORD_UNASSIGNED_ENTITY",
+  "UPSERT_ENTITY_META", "RECORD_SECURITY_EVENT", "SET_MODE", "OPEN_DASHBOARD_REQUEST",
+  "USER_ACTIVITY", "TOGGLE_FAVORITE", "OPEN_SECURE_AUTH"
+]);
+
+function assertMessageContext(message, context) {
+  const type = message && message.type;
+  if (!type || context === "unauthorized" || context === "unknown") throw new Error("UNAUTHORIZED_SENDER");
+  if (context === "content" && !CONTENT_ALLOWED_MESSAGES.has(type)) throw new Error("CONTENT_ACTION_NOT_ALLOWED");
+}
+
+function redactSnapshotForContent(snapshot) {
+  if (!snapshot || typeof snapshot !== "object") return snapshot;
+  const activeId = snapshot.activeProfileId;
+  const profiles = {};
+  if (snapshot.unlocked && activeId && snapshot.profiles && snapshot.profiles[activeId]) profiles[activeId] = snapshot.profiles[activeId];
+  const redactOwners = (owners) => Object.fromEntries(Object.entries(owners || {}).map(([id, owner]) => [id, owner === activeId ? activeId : FOREIGN_OWNER]));
+  return {
+    ...snapshot,
+    profiles,
+    profileOrder: activeId && profiles[activeId] ? [activeId] : [],
+    conversationOwners: snapshot.unlocked ? redactOwners(snapshot.conversationOwners) : {},
+    projectOwners: snapshot.unlocked ? redactOwners(snapshot.projectOwners) : {},
+    rules: [],
+    globalSettings: snapshot.unlocked ? {
+      autoAssignNew: snapshot.globalSettings && snapshot.globalSettings.autoAssignNew !== false,
+      promptUnassigned: snapshot.globalSettings && snapshot.globalSettings.promptUnassigned !== false
+    } : {}
+  };
+}
+
+function redactResponseForContext(data, context) {
+  if (context !== "content" || data == null) return data;
+  if (data && typeof data === "object" && Object.prototype.hasOwnProperty.call(data, "configured") && Object.prototype.hasOwnProperty.call(data, "unlocked")) return redactSnapshotForContent(data);
+  if (data && typeof data === "object" && data.snapshot) return { ...data, snapshot: redactSnapshotForContent(data.snapshot) };
+  return data;
+}
+
+async function sha256Hex(text) {
+  const bytes = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(text))));
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function getSupportUrl() {
+  const decoded = C.base64UrlToUtf8(SUPPORT_LINK_B64_PARTS.join(""));
+  const expected = SUPPORT_LINK_SHA256_PARTS.join("");
+  if (await sha256Hex(decoded) !== expected) throw new Error("SUPPORT_LINK_INTEGRITY_FAILED");
+  const url = new URL(decoded);
+  if (url.protocol !== "https:" || url.hostname !== "github.com" || !url.pathname.startsWith("/sponsors/")) throw new Error("INVALID_SUPPORT_LINK");
+  return url.href;
+}
+
+async function openSupport() {
+  const url = await getSupportUrl();
+  await chrome.tabs.create({ url });
+  return { opened: true };
+}
+
+function cleanupSecureRequests(raw) {
+  const now = Date.now();
+  const source = raw && typeof raw === "object" ? raw : {};
+  const out = {};
+  for (const [nonce, request] of Object.entries(source)) {
+    if (!request || typeof request !== "object") continue;
+    if (now - Number(request.createdAt || 0) > 10 * 60 * 1000) continue;
+    out[nonce] = request;
+  }
+  return out;
+}
+
+async function readSecureRequests() {
+  const result = await chrome.storage.session.get(SECURE_REQUESTS_KEY);
+  return cleanupSecureRequests(result[SECURE_REQUESTS_KEY]);
+}
+
+async function writeSecureRequests(requests) {
+  await chrome.storage.session.set({ [SECURE_REQUESTS_KEY]: cleanupSecureRequests(requests) });
+}
+
+async function openSecureAuth(message, sender) {
+  const mode = ["setup", "login", "assign", "sensitive"].includes(message.mode) ? message.mode : "login";
+  const request = {
+    nonce: C.createId("auth"),
+    mode,
+    createdAt: Date.now(),
+    sourceTabId: sender && sender.tab && Number.isInteger(sender.tab.id) ? sender.tab.id : null,
+    preselectedProfileId: C.isValidProfileId(message.profileId) ? message.profileId : null,
+    entityType: message.entityType === "project" ? "project" : "conversation",
+    entityId: null,
+    conversationIds: [],
+    projectIds: []
+  };
+  if (mode === "assign" || mode === "sensitive") {
+    request.entityId = request.entityType === "project" ? C.normalizeProjectId(message.entityId) : C.normalizeConversationId(message.entityId);
+    if (!request.entityId) throw new Error("INVALID_ENTITY");
+  }
+  if (mode === "setup") {
+    request.conversationIds = (Array.isArray(message.conversationIds) ? message.conversationIds : []).map((id) => C.normalizeConversationId(id)).filter(Boolean).slice(0, 5000);
+    request.projectIds = (Array.isArray(message.projectIds) ? message.projectIds : []).map((id) => C.normalizeProjectId(id)).filter(Boolean).slice(0, 1000);
+  }
+  if (mode === "assign" && request.entityType === "project") {
+    request.conversationIds = (Array.isArray(message.conversationIds) ? message.conversationIds : []).map((id) => C.normalizeConversationId(id)).filter(Boolean).slice(0, 5000);
+  }
+  const requests = await readSecureRequests();
+  requests[request.nonce] = request;
+  await writeSecureRequests(requests);
+  await chrome.tabs.create({ url: chrome.runtime.getURL(`secure-auth.html?nonce=${encodeURIComponent(request.nonce)}`), active: true });
+  return { opened: true, nonce: request.nonce };
+}
+
+async function getSecureRequest(message) {
+  const nonce = C.sanitizeText(message.nonce, 120);
+  const requests = await readSecureRequests();
+  const request = requests[nonce];
+  if (!request) throw new Error("SECURE_REQUEST_EXPIRED");
+  return request;
+}
+
+async function clearSecureRequest(message) {
+  const nonce = C.sanitizeText(message.nonce, 120);
+  const requests = await readSecureRequests();
+  delete requests[nonce];
+  await writeSecureRequests(requests);
+  return { cleared: true };
+}
+
+async function closeSecureAuth(_message, sender) {
+  if (sender && sender.tab && Number.isInteger(sender.tab.id)) await chrome.tabs.remove(sender.tab.id).catch(() => undefined);
+  return { closed: true };
+}
+
 function serialized(task) {
   const pending = operationQueue.then(task, task);
   operationQueue = pending.catch(() => undefined);
@@ -30,6 +186,7 @@ async function readSession() {
     vaultKey: typeof raw.vaultKey === "string" ? raw.vaultKey : null,
     failedAttempts: Number.isInteger(raw.failedAttempts) ? raw.failedAttempts : 0,
     blockedUntil: Number.isFinite(raw.blockedUntil) ? Number(raw.blockedUntil) : 0,
+    authFailures: raw.authFailures && typeof raw.authFailures === "object" ? raw.authFailures : {},
     lastActivityAt: Number.isFinite(raw.lastActivityAt) ? Number(raw.lastActivityAt) : 0,
     authorizedEntities: raw.authorizedEntities && typeof raw.authorizedEntities === "object" ? raw.authorizedEntities : {},
     presentationMode: raw.presentationMode === true,
@@ -52,6 +209,7 @@ function blankSession() {
     vaultKey: null,
     failedAttempts: 0,
     blockedUntil: 0,
+    authFailures: {},
     lastActivityAt: 0,
     authorizedEntities: {},
     presentationMode: false,
@@ -515,17 +673,22 @@ async function unlock(message) {
       throw new Error("PROFILE_EXPIRED");
     }
     if (!C.isScheduleAllowed(profile.schedule, new Date())) throw new Error("PROFILE_OUTSIDE_SCHEDULE");
-    if (session.blockedUntil > now) throw new Error(`TEMPORARILY_BLOCKED:${Math.max(1, Math.ceil((session.blockedUntil - now) / 1000))}`);
+    const authFailures = session.authFailures && typeof session.authFailures === "object" ? session.authFailures : {};
+    const authState = authFailures[profileId] && typeof authFailures[profileId] === "object" ? authFailures[profileId] : { count: 0, blockedUntil: 0 };
+    if (Number(authState.blockedUntil || 0) > now) throw new Error(`TEMPORARILY_BLOCKED:${Math.max(1, Math.ceil((authState.blockedUntil - now) / 1000))}`);
     const verified = await C.verifyCredential(message.password, profile.credential);
     if (!verified) {
-      const attempts = session.failedAttempts + 1;
-      const pause = attempts >= 5;
-      const next = blankSession();
-      next.failedAttempts = pause ? 0 : attempts;
-      next.blockedUntil = pause ? now + 30000 : 0;
+      const count = Math.min(50, Number(authState.count || 0) + 1);
+      let delayMs = 0;
+      if (count >= 15) delayMs = 30 * 60 * 1000;
+      else if (count >= 10) delayMs = 5 * 60 * 1000;
+      else if (count >= 5) delayMs = 30 * 1000;
+      const next = { ...session, vaultKey: null, unlockedProfileId: null, authorizedEntities: {}, presentationMode: false, screenshotMode: false };
+      next.authFailures = { ...authFailures, [profileId]: { count, blockedUntil: delayMs ? now + delayMs : 0 } };
       await writeSession(next);
-      throw new Error(pause ? "TEMPORARILY_BLOCKED:30" : "WRONG_PASSWORD");
+      throw new Error(delayMs ? `TEMPORARILY_BLOCKED:${Math.ceil(delayMs / 1000)}` : "WRONG_PASSWORD");
     }
+    session.authFailures = { ...authFailures, [profileId]: { count: 0, blockedUntil: 0 } };
 
     if (profile.webauthn && profile.webauthn.enabled) {
       await verifyWebauthnAssertion(profile, session, message.webauthnAssertion);
@@ -559,6 +722,7 @@ async function unlock(message) {
     state.activeProfileId = profileId;
     vault.activityLog = C.addLog(vault.activityLog, { profileId, action: "profile_unlock" });
     const next = blankSession();
+    next.authFailures = session.authFailures || {};
     next.unlockedProfileId = profileId;
     next.vaultKey = vaultKey ? C.bytesToBase64(vaultKey) : null;
     next.lastActivityAt = now;
@@ -723,7 +887,7 @@ async function autoAssign(message) {
     metaMap[id] = {
       ...(metaMap[id] || {}),
       title: C.sanitizeText(message.title, 160),
-      url: C.sanitizeText(message.url, 500),
+      url: C.sanitizeEntityUrl(message.url, kind, id),
       projectId: kind === "conversation" ? C.normalizeProjectId(message.projectId || "") : null,
       createdAt: Date.now(),
       lastSeenAt: Date.now(),
@@ -746,7 +910,7 @@ async function recordUnassignedEntity(message) {
     map[id] = {
       ...current,
       title: C.sanitizeText(message.title || current.title, 160),
-      url: C.sanitizeText(message.url || current.url, 500),
+      url: C.sanitizeEntityUrl(message.url || current.url, kind, id),
       projectId: kind === "conversation" ? C.normalizeProjectId(message.projectId || current.projectId || "") : null,
       lastSeenAt: Date.now(),
       updatedAt: Date.now(),
@@ -854,7 +1018,7 @@ async function upsertEntityMeta(message) {
       extraLock: patch.extraLock === undefined ? current.extraLock === true : patch.extraLock === true,
       tags: patch.tags === undefined ? (current.tags || []) : [...new Set((Array.isArray(patch.tags) ? patch.tags : []).map(C.sanitizeTag).filter(Boolean))].slice(0, 20),
       projectId: kind === "conversation" ? (patch.projectId === undefined ? current.projectId : C.normalizeProjectId(patch.projectId || "")) : null,
-      url: patch.url === undefined ? current.url : C.sanitizeText(patch.url, 500),
+      url: patch.url === undefined ? current.url : C.sanitizeEntityUrl(patch.url, kind, id),
       lastSeenAt: patch.lastSeenAt === undefined ? (current.lastSeenAt || Date.now()) : Number(patch.lastSeenAt) || Date.now(),
       updatedAt: Date.now()
     };
@@ -907,6 +1071,7 @@ async function authorizeEntity(message) {
     vault.securityLog = C.addLog(vault.securityLog, { profileId: state.activeProfileId, action: "sensitive_access_granted", entityId });
     await persistVault(state, session, vault);
     await writeSession(session);
+    await broadcast();
     return publicSnapshot(state, session, vault);
   });
 }
@@ -1375,7 +1540,138 @@ async function toggleFavorite(message) {
   return snapshot;
 }
 
-async function handleMessage(message) {
+
+const GITHUB_REPOSITORY = "dzvellox/DuoChat";
+const UPDATE_STATE_KEY = "__duochat_github_update_v1";
+const UPDATE_PREFS_KEY = "__duochat_github_update_prefs_v1";
+const UPDATE_ALARM = "duochat-github-updates";
+const UPDATE_PERIOD_MINUTES = 360;
+
+function parseVersion(value) {
+  const match = String(value || "").trim().replace(/^v/i, "").match(/^(\d+)\.(\d+)\.(\d+)(?:[-+]([0-9A-Za-z.-]+))?/);
+  if (!match) return null;
+  return { major:Number(match[1]), minor:Number(match[2]), patch:Number(match[3]), pre:match[4] || "" };
+}
+
+function compareVersions(aValue, bValue) {
+  const a=parseVersion(aValue), b=parseVersion(bValue);
+  if (!a || !b) return 0;
+  for (const key of ["major","minor","patch"]) if (a[key] !== b[key]) return a[key] > b[key] ? 1 : -1;
+  if (a.pre === b.pre) return 0;
+  if (!a.pre) return 1;
+  if (!b.pre) return -1;
+  return a.pre.localeCompare(b.pre, undefined, { numeric:true, sensitivity:"base" });
+}
+
+async function readUpdatePrefs() {
+  const raw=(await chrome.storage.local.get(UPDATE_PREFS_KEY))[UPDATE_PREFS_KEY] || {};
+  return { channel: raw.channel === "beta" ? "beta" : "stable" };
+}
+
+async function setUpdateChannel(message) {
+  const channel=message && message.channel === "beta" ? "beta" : "stable";
+  await chrome.storage.local.set({[UPDATE_PREFS_KEY]:{channel}});
+  return checkGithubUpdate(true);
+}
+
+function pickGithubRelease(releases, channel) {
+  const usable=(Array.isArray(releases)?releases:[]).filter((release)=>release && !release.draft && release.tag_name && (channel === "beta" || !release.prerelease));
+  usable.sort((a,b)=>compareVersions(b.tag_name,a.tag_name));
+  return usable[0] || null;
+}
+
+function pickReleaseAsset(release, version) {
+  const assets=Array.isArray(release && release.assets)?release.assets:[];
+  const exact=assets.find((asset)=>asset && typeof asset.name === "string" && asset.name.toLowerCase() === `duochat-${version}.zip`.toLowerCase());
+  const generic=assets.find((asset)=>asset && typeof asset.name === "string" && /^duochat[-_].*\.zip$/i.test(asset.name));
+  return exact || generic || null;
+}
+
+function trustedGithubReleaseUrl(raw) {
+  try {
+    const url = new URL(String(raw || ""));
+    if (url.protocol !== "https:" || url.hostname !== "github.com") return null;
+    if (!url.pathname.startsWith(`/${GITHUB_REPOSITORY}/releases`)) return null;
+    return url.href;
+  } catch (_error) { return null; }
+}
+
+function trustedGithubAssetUrl(raw) {
+  try {
+    const url = new URL(String(raw || ""));
+    if (url.protocol !== "https:" || url.hostname !== "github.com") return null;
+    if (!url.pathname.startsWith(`/${GITHUB_REPOSITORY}/releases/download/`)) return null;
+    return url.href;
+  } catch (_error) { return null; }
+}
+
+async function saveUpdateStatus(status) {
+  await chrome.storage.local.set({[UPDATE_STATE_KEY]:status});
+  try {
+    await chrome.action.setBadgeText({text:status && status.updateAvailable ? "UPD" : ""});
+    if (status && status.updateAvailable) await chrome.action.setBadgeBackgroundColor({color:"#6d5dfc"});
+  } catch (_error) { /* badge is optional */ }
+  return status;
+}
+
+async function checkGithubUpdate(force=false) {
+  const currentVersion=chrome.runtime.getManifest().version;
+  const prefs=await readUpdatePrefs();
+  const previous=(await chrome.storage.local.get(UPDATE_STATE_KEY))[UPDATE_STATE_KEY] || null;
+  if (!force && previous && previous.channel === prefs.channel && Date.now() - Number(previous.checkedAt || 0) < 30 * 60 * 1000) return previous;
+  try {
+    const response=await fetch(`https://api.github.com/repos/${GITHUB_REPOSITORY}/releases?per_page=20`, {
+      cache:"no-store",
+      headers:{"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"}
+    });
+    if (!response.ok) throw new Error(`GITHUB_HTTP_${response.status}`);
+    const releases=await response.json();
+    const release=pickGithubRelease(releases,prefs.channel);
+    if (!release) throw new Error("NO_GITHUB_RELEASE");
+    const latestVersion=String(release.tag_name).replace(/^v/i,"");
+    const asset=pickReleaseAsset(release,latestVersion);
+    const status={
+      checkedAt:Date.now(), channel:prefs.channel, currentVersion, latestVersion,
+      updateAvailable:compareVersions(latestVersion,currentVersion)>0,
+      releaseName:String(release.name || release.tag_name || latestVersion).slice(0,200),
+      releaseUrl:trustedGithubReleaseUrl(release.html_url) || `https://github.com/${GITHUB_REPOSITORY}/releases`,
+      assetUrl:asset && asset.browser_download_url ? trustedGithubAssetUrl(asset.browser_download_url) : null,
+      assetName:asset && asset.name ? String(asset.name).slice(0,255) : null,
+      assetDigest:asset && typeof asset.digest === "string" && /^sha256:[0-9a-f]{64}$/i.test(asset.digest) ? asset.digest.toLowerCase() : null,
+      publishedAt:release.published_at || release.created_at || null,
+      notes:String(release.body || "").slice(0,6000), error:null
+    };
+    return saveUpdateStatus(status);
+  } catch (error) {
+    const status={checkedAt:Date.now(),channel:prefs.channel,currentVersion,latestVersion:null,updateAvailable:false,releaseName:null,releaseUrl:`https://github.com/${GITHUB_REPOSITORY}/releases`,assetUrl:null,assetName:null,assetDigest:null,publishedAt:null,notes:"",error:error && error.message ? error.message : "GITHUB_UPDATE_ERROR"};
+    return saveUpdateStatus(status);
+  }
+}
+
+async function getUpdateStatus() {
+  const prefs=await readUpdatePrefs();
+  const stored=(await chrome.storage.local.get(UPDATE_STATE_KEY))[UPDATE_STATE_KEY] || null;
+  if (!stored || stored.channel !== prefs.channel) return checkGithubUpdate(false);
+  return {...stored,currentVersion:chrome.runtime.getManifest().version,channel:prefs.channel};
+}
+
+async function downloadGithubUpdate() {
+  const status=await checkGithubUpdate(false);
+  if (!status.updateAvailable) throw new Error("NO_UPDATE_AVAILABLE");
+  const assetUrl = trustedGithubAssetUrl(status.assetUrl);
+  if (!assetUrl) throw new Error("UPDATE_ZIP_NOT_FOUND");
+  const id=await chrome.downloads.download({url:assetUrl,filename:status.assetName || `DuoChat-${status.latestVersion}.zip`,saveAs:true,conflictAction:"uniquify"});
+  return {downloadId:id,latestVersion:status.latestVersion,assetName:status.assetName,assetDigest:status.assetDigest || null};
+}
+
+async function openGithubRelease() {
+  const status=await getUpdateStatus();
+  const url = trustedGithubReleaseUrl(status.releaseUrl) || `https://github.com/${GITHUB_REPOSITORY}/releases`;
+  await chrome.tabs.create({url});
+  return true;
+}
+
+async function handleMessage(message, sender, context) {
   switch (message && message.type) {
     case "GET_SNAPSHOT": return getSnapshot();
     case "GET_LANGUAGE": return getLanguage();
@@ -1429,17 +1725,26 @@ async function handleMessage(message) {
     case "ENABLE_ENCRYPTION": return enableEncryption(message);
     case "USER_ACTIVITY": return userActivity();
     case "TOGGLE_FAVORITE": return toggleFavorite(message);
+    case "GET_UPDATE_STATUS": return getUpdateStatus();
+    case "CHECK_GITHUB_UPDATE": return checkGithubUpdate(true);
+    case "SET_UPDATE_CHANNEL": return setUpdateChannel(message);
+    case "DOWNLOAD_GITHUB_UPDATE": return downloadGithubUpdate();
+    case "OPEN_GITHUB_RELEASE": return openGithubRelease();
+    case "OPEN_SUPPORT": return openSupport();
+    case "OPEN_SECURE_AUTH": return openSecureAuth(message, sender);
+    case "GET_SECURE_REQUEST": return getSecureRequest(message);
+    case "CLEAR_SECURE_REQUEST": return clearSecureRequest(message);
+    case "CLOSE_SECURE_AUTH": return closeSecureAuth(message, sender);
     default: throw new Error("UNKNOWN_MESSAGE");
   }
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (sender.id !== chrome.runtime.id) {
-    sendResponse({ ok: false, error: "UNAUTHORIZED_SENDER" });
-    return false;
-  }
-  handleMessage(message)
-    .then((data) => sendResponse({ ok: true, data }))
+  const context = senderContext(sender);
+  try { assertMessageContext(message, context); }
+  catch (error) { sendResponse({ ok: false, error: error.message || "UNAUTHORIZED_SENDER" }); return false; }
+  handleMessage(message, sender, context)
+    .then((data) => sendResponse({ ok: true, data: redactResponseForContext(data, context) }))
     .catch((error) => sendResponse({ ok: false, error: error && error.message ? error.message : "UNKNOWN_ERROR" }));
   return true;
 });
@@ -1527,15 +1832,21 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     await checkAutoLock();
     await cleanupTemporaryProfiles();
   }
+  if (alarm.name === UPDATE_ALARM) await checkGithubUpdate(true).catch(() => undefined);
 });
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.alarms.create("duochat-maintenance", { periodInMinutes: 1 });
+  chrome.alarms.create(UPDATE_ALARM, { delayInMinutes: 1, periodInMinutes: UPDATE_PERIOD_MINUTES });
+  checkGithubUpdate(true).catch(() => undefined);
 });
 chrome.runtime.onStartup.addListener(async () => {
   chrome.alarms.create("duochat-maintenance", { periodInMinutes: 1 });
+  chrome.alarms.create(UPDATE_ALARM, { delayInMinutes: 1, periodInMinutes: UPDATE_PERIOD_MINUTES });
+  checkGithubUpdate(false).catch(() => undefined);
   // Mark session guests as expired without decrypting the vault. They are purged on the next authorized unlock.
   await markSessionGuestsExpired().catch(() => undefined);
   await cleanupTemporaryProfiles().catch(() => undefined);
 });
 chrome.alarms.create("duochat-maintenance", { periodInMinutes: 1 });
+chrome.alarms.create(UPDATE_ALARM, { delayInMinutes: 1, periodInMinutes: UPDATE_PERIOD_MINUTES });

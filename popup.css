@@ -980,3 +980,5 @@ footer {
 }
 
 .transfer-qr{display:flex;justify-content:center;align-items:center;padding:12px;background:#fff;border-radius:14px;margin-top:12px;overflow:hidden}.transfer-qr[hidden]{display:none}.transfer-qr svg{display:block;max-width:220px!important}.settings-security .divider{margin:14px 0}
+
+.support-button{margin-top:10px;border-color:rgba(101,88,232,.28);background:rgba(101,88,232,.065);color:#5e52db}.support-button:hover{background:rgba(101,88,232,.12)}

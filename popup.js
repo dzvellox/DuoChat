@@ -46,6 +46,26 @@
   }
 
 
+
+  async function refreshPopupUpdate(force=false) {
+    const statusEl=document.getElementById("popup-update-status");
+    const downloadEl=document.getElementById("popup-update-download");
+    const versionEl=document.getElementById("popup-version-label");
+    if (!statusEl) return;
+    if (versionEl) versionEl.textContent=`v${chrome.runtime.getManifest().version}`;
+    statusEl.textContent=t("updatesChecking");
+    try {
+      const status=await send({type:force?"CHECK_GITHUB_UPDATE":"GET_UPDATE_STATUS"});
+      if (status.error) statusEl.textContent=`${t("errorGeneric")} (${status.error})`;
+      else if (status.updateAvailable) statusEl.textContent=t("updatesAvailable",{version:status.latestVersion});
+      else statusEl.textContent=t("updatesCurrent");
+      if (downloadEl) downloadEl.hidden=!status.updateAvailable || !status.assetUrl;
+    } catch (error) {
+      statusEl.textContent=t("errorGeneric");
+      if (downloadEl) downloadEl.hidden=true;
+    }
+  }
+
   function bytesToBase64Url(bytes) {
     return C.bytesToBase64Url(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes));
   }
@@ -328,6 +348,7 @@
     statusPill.textContent = t("statusOpen");
     renderWebauthnSettings();
     showView("settings");
+    refreshPopupUpdate(false);
   }
 
   async function importCode(code, feedbackElement) {
@@ -430,6 +451,18 @@
   document.getElementById("settings-shortcut").addEventListener("click", showSettings);
   document.getElementById("dashboard-shortcut").addEventListener("click", () => send({ type: "OPEN_DASHBOARD_REQUEST" }).then(() => window.close()).catch(() => undefined));
   document.getElementById("back-settings").addEventListener("click", render);
+  document.getElementById("open-secure-setup")?.addEventListener("click", async (event) => {
+    const button = event.currentTarget; button.disabled = true;
+    try { await send({ type: "OPEN_SECURE_AUTH", mode: "setup", conversationIds: [], projectIds: [] }); }
+    catch (_error) { button.disabled = false; }
+  });
+  document.getElementById("support-duochat")?.addEventListener("click", async () => {
+    try { await send({ type: "OPEN_SUPPORT" }); } catch (_error) {}
+  });
+
+  document.getElementById("popup-update-check")?.addEventListener("click",()=>refreshPopupUpdate(true));
+  document.getElementById("popup-update-download")?.addEventListener("click",async()=>{try{await send({type:"DOWNLOAD_GITHUB_UPDATE"});}catch(error){console.error(error);}});
+
 
   document.getElementById("show-add-profile").addEventListener("click", () => {
     document.getElementById("show-add-profile").hidden = true;

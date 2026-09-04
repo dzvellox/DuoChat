@@ -2,19 +2,20 @@
 
 **Version 1.0**
 
-Copyright (c) 2026 **[YOUR LEGAL NAME OR COMPANY NAME]**  
-Contact: **[YOUR CONTACT EMAIL]**
+Copyright (c) 2026 **dzvellox**  
+Contact: **zvellox@gmail.com**  
+GitHub: **https://github.com/dzvellox**
 
 > [!IMPORTANT]
-> This document is a template for a separate proprietary commercial license for DuoChat. Replace all text in square brackets before using it.
->
 > DuoChat is also available under the GNU Affero General Public License v3.0 (`AGPL-3.0`). Commercial use is permitted under the AGPL-3.0 when all AGPL-3.0 requirements are followed. This Commercial License is an alternative for licensees who want proprietary rights that are not available under the AGPL-3.0.
+>
+> The Licensor publicly operates under the pseudonym **dzvellox**. Legal identity, billing information, and any information required by applicable law will be provided to a prospective commercial licensee before a commercial agreement is executed when necessary.
 
 ## 1. Definitions
 
 For the purposes of this Commercial License:
 
-**"Licensor"** means **[YOUR LEGAL NAME OR COMPANY NAME]**, the copyright holder of DuoChat.
+**"Licensor"** means **dzvellox**, the copyright holder of DuoChat, publicly operating under that pseudonym.
 
 **"Software"** means the DuoChat source code, object code, extension package, documentation, and any other material expressly provided by the Licensor under this Commercial License.
 
@@ -187,9 +188,9 @@ The Licensee agrees to defend and indemnify the Licensor against third-party cla
 
 ## 16. Governing Law
 
-This Commercial License is governed by the laws of **[YOUR COUNTRY / STATE / JURISDICTION]**, excluding its conflict-of-law rules.
+The governing law and competent jurisdiction will be specified in the written commercial authorization, order form, invoice, or separately executed agreement applicable to the Licensee. Mandatory laws and jurisdiction rules that cannot legally be waived remain applicable.
 
-The courts located in **[YOUR CITY / JURISDICTION]** will have jurisdiction over disputes arising from this Commercial License, unless mandatory law requires otherwise.
+This public repository intentionally does not disclose the Licensor's private legal identity or residential address. Where disclosure is legally or contractually required, the necessary information will be provided directly to the relevant commercial licensee.
 
 ## 17. Changes to Commercial Terms
 
@@ -207,9 +208,9 @@ If a separately signed agreement conflicts with this document, the separately si
 
 Commercial licensing inquiries:
 
-**[YOUR LEGAL NAME OR COMPANY NAME]**  
-Email: **[YOUR CONTACT EMAIL]**  
-GitHub: **[YOUR GITHUB PROFILE OR REPOSITORY URL]**
+**dzvellox**  
+Email: **zvellox@gmail.com**  
+GitHub: **https://github.com/dzvellox**
 
 ---
 

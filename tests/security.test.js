@@ -65,7 +65,8 @@ test("le PIN supplémentaire utilise un identifiant séparé du profil",()=>{
 
 test("les raccourcis personnalisables et l’attribution initiale multi-profils sont câblés",()=>{
   assert.match(content,/shortcutMatches/);
-  assert.match(content,/firstProfileIndex/);
+  const secureAuth=fs.readFileSync(path.join(root,"secure-auth.js"),"utf8");
+  assert.match(secureAuth,/firstProfileIndex/);
   assert.match(background,/firstProfileIndex/);
 });
 

@@ -40,8 +40,9 @@
         <div class="empty-icon" aria-hidden="true">∞</div>
         <h2 data-i18n="setupTitle">Configuration nécessaire</h2>
         <p data-i18n="setupLead">Ouvre ChatGPT ou Claude pour créer les deux utilisateurs et leurs mots de passe.</p>
+        <button id="open-secure-setup" class="button button-primary full-width" type="button" data-i18n="secureSetupOpen">Ouvrir la configuration sécurisée</button>
         <div class="service-actions">
-          <button id="open-chatgpt" class="button button-primary" type="button" data-i18n="openChatgpt">Ouvrir ChatGPT</button>
+          <button id="open-chatgpt" class="button button-secondary" type="button" data-i18n="openChatgpt">Ouvrir ChatGPT</button>
           <button id="open-claude" class="button button-secondary" type="button" data-i18n="openClaude">Ouvrir Claude</button>
         </div>
         <div class="setup-import">
@@ -117,6 +118,11 @@
           <span data-i18n="settings">Paramètres</span>
         </button>
 
+        <button id="support-duochat" class="button button-secondary full-width settings-shortcut support-button" type="button">
+          <span aria-hidden="true">🍪</span>
+          <span data-i18n="supportCookie">Buy me a cookie</span>
+        </button>
+
         <button id="lock-now" class="button button-quiet" type="button">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3m-9 0h8a2 2 0 0 1 2 2v7H6v-7a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
           <span data-i18n="lockNow">Verrouiller maintenant</span>
@@ -169,6 +175,16 @@
           <div id="popup-transfer-qr" class="transfer-qr" hidden></div>
           <p id="popup-transfer-qr-help" class="muted-note"></p>
           <p class="muted-note" data-i18n="transferPrivacy">Le code ne contient aucun message, mais il contient les profils, les empreintes des mots de passe et les attributions. Garde-le privé.</p>
+        </section>
+
+        <section class="settings-section">
+          <div class="section-title-row"><div><span class="section-kicker">GitHub</span><h3 data-i18n="updatesSection">Mises à jour</h3></div></div>
+          <p class="settings-help" data-i18n="updatesHelp">Vérifie gratuitement les releases GitHub de DuoChat.</p>
+          <div class="settings-row"><strong id="popup-version-label">v1.5.2</strong><span id="popup-update-status" class="muted" data-i18n="updatesIdle">Pas encore vérifié</span></div>
+          <div class="settings-actions">
+            <button id="popup-update-check" class="button button-secondary" type="button" data-i18n="updatesCheck">Vérifier</button>
+            <button id="popup-update-download" class="button button-primary" type="button" data-i18n="updatesDownload" hidden>Télécharger</button>
+          </div>
         </section>
 
         <section class="settings-section settings-security">
