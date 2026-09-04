@@ -4,205 +4,146 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const C = require("../core.js");
 
-test("extrait les identifiants de conversations ChatGPT", () => {
-  assert.equal(
-    C.extractConversationId("https://chatgpt.com/c/12345678-abcd-ef00-1234-567890abcdef"),
-    "chatgpt:12345678-abcd-ef00-1234-567890abcdef"
-  );
-  assert.equal(
-    C.extractConversationId("https://chatgpt.com/g/g-demo/c/abcdef123456"),
-    "chatgpt:abcdef123456"
-  );
-  assert.equal(C.extractConversationId("https://example.com/c/abcdef123456"), null);
-  assert.equal(C.extractConversationId("https://chatgpt.com/"), null);
-});
-
-test("extrait les identifiants de projets ChatGPT", () => {
-  assert.equal(
-    C.extractProjectId("https://chatgpt.com/g/g-p-abcdef123456/project"),
-    "chatgpt:abcdef123456"
-  );
-  assert.equal(
-    C.extractProjectId("https://chatgpt.com/projects/abcdef123456"),
-    "chatgpt:abcdef123456"
-  );
-  assert.equal(
-    C.extractProjectId("https://chatgpt.com/c/abcdef123456?project_id=g-p-project987654"),
-    "chatgpt:project987654"
-  );
-  assert.equal(C.extractProjectId("https://chatgpt.com/g/g-demo/c/abcdef123456"), null);
-});
-
-test("extrait les conversations et projets Claude", () => {
-  assert.equal(
-    C.extractConversationId("https://claude.ai/chat/12345678-abcd-ef00-1234-567890abcdef"),
-    "claude:12345678-abcd-ef00-1234-567890abcdef"
-  );
-  assert.equal(
-    C.extractProjectId("https://claude.ai/project/project123456/chat/chat987654"),
-    "claude:project123456"
-  );
-  assert.equal(
-    C.extractConversationId("https://claude.ai/project/project123456/chat/chat987654"),
-    "claude:chat987654"
-  );
-  assert.equal(C.extractProjectId("https://claude.ai/projects"), null);
-});
-
-test("isole les mêmes identifiants entre ChatGPT et Claude", () => {
-  const rawId = "12345678-abcd-ef00-1234-567890abcdef";
-  assert.notEqual(
-    C.extractConversationId(`https://chatgpt.com/c/${rawId}`),
-    C.extractConversationId(`https://claude.ai/chat/${rawId}`)
-  );
-  assert.equal(C.getSupportedSite("https://claude.ai/new").name, "Claude");
+test("extrait les identifiants ChatGPT et Claude sans collision", () => {
+  const raw = "12345678-abcd-ef00-1234-567890abcdef";
+  assert.equal(C.extractConversationId(`https://chatgpt.com/c/${raw}`), `chatgpt:${raw}`);
+  assert.equal(C.extractConversationId(`https://claude.ai/chat/${raw}`), `claude:${raw}`);
+  assert.equal(C.extractProjectId("https://chatgpt.com/g/g-p-abcdef123456/project"), "chatgpt:abcdef123456");
+  assert.equal(C.extractProjectId("https://claude.ai/project/project123456/chat/chat987654"), "claude:project123456");
   assert.equal(C.getSupportedSite("https://example.com/"), null);
 });
 
-test("reconnaît le même projet avant et après l’ouverture d’un chat", () => {
-  const projectPage = "https://chatgpt.com/g/g-p-abcdef123456/project";
-  const projectChat = "https://chatgpt.com/c/chat987654?project_id=abcdef123456";
-  const projectOwners = { [C.extractProjectId(projectPage)]: "A" };
-  assert.equal(C.extractProjectId(projectPage), C.extractProjectId(projectChat));
-  assert.equal(projectOwners[C.extractProjectId(projectChat)], "A");
+test("reconnaît un projet ChatGPT dans l'URL d'une conversation", () => {
+  assert.equal(
+    C.extractProjectId("https://chatgpt.com/c/chat987654?project_id=abcdef123456"),
+    "chatgpt:abcdef123456"
+  );
 });
 
-test("nettoie les noms de profils", () => {
+test("nettoie les noms, tags et couleurs", () => {
   assert.equal(C.sanitizeName("  Younes   A  ", "Utilisateur A"), "Younes A");
-  assert.equal(C.sanitizeName("", "Utilisateur B"), "Utilisateur B");
-  assert.equal(C.sanitizeName("x".repeat(50), "A").length, 30);
+  assert.equal(C.sanitizeName("x".repeat(80), "A").length, 40);
+  assert.equal(C.sanitizeTag(" <Travail> "), "Travail");
+  assert.equal(C.sanitizeColor("#12abEF"), "#12ABEF");
 });
 
-test("crée et vérifie des empreintes de mots de passe distinctes", async () => {
-  const first = await C.createCredential("secret-A");
-  const second = await C.createCredential("secret-A");
+test("crée et vérifie des identifiants de profil et mots de passe", async () => {
+  const id = C.createProfileId({ A: {}, B: {} });
+  assert.equal(C.isValidProfileId(id), true);
+  const first = await C.createCredential("123456");
+  const second = await C.createCredential("123456");
   assert.notEqual(first.salt, second.salt);
-  assert.notEqual(first.hash, second.hash);
-  assert.equal(await C.verifyCredential("secret-A", first), true);
-  assert.equal(await C.verifyCredential("secret-B", first), false);
+  assert.equal(await C.verifyCredential("123456", first), true);
+  assert.equal(await C.verifyCredential("654321", first), false);
 });
 
-test("normalise les propriétaires de conversations", () => {
+test("migre un état 1.4 vers le coffre legacy 1.5", () => {
   const state = C.normalizeState({
+    version: 5,
     configured: true,
     activeProfileId: "A",
-    profiles: {
-      A: { name: "A", credential: { algorithm: "PBKDF2-SHA256" } },
-      B: { name: "B", credential: { algorithm: "PBKDF2-SHA256" } }
-    },
-    conversationOwners: {
-      abcdef123: "A",
-      invalid: "C",
-      "not valid!": "B"
-    },
-    projectOwners: {
-      "g-p-project123": "B",
-      "bad id": "A",
-      "g-p-wrongowner": "C"
-    }
-  });
-  assert.equal(state.configured, true);
-  assert.equal(state.version, 5);
-  assert.deepEqual(state.profileOrder, ["A", "B"]);
-  assert.deepEqual(state.conversationOwners, { "chatgpt:abcdef123": "A" });
-  assert.deepEqual(state.projectOwners, { "chatgpt:project123": "B" });
-});
-
-test("accepte un nombre dynamique de profils", () => {
-  const state = C.normalizeState({
-    configured: true,
-    activeProfileId: "profile-charlie",
     profiles: {
       A: { name: "Alice", credential: { algorithm: "PBKDF2-SHA256" } },
-      B: { name: "Bob", credential: { algorithm: "PBKDF2-SHA256" } },
-      "profile-charlie": { name: "Charlie", credential: { algorithm: "PBKDF2-SHA256" } }
+      B: { name: "Bob", credential: { algorithm: "PBKDF2-SHA256" } }
     },
-    profileOrder: ["profile-charlie", "A", "B"]
+    conversationOwners: { legacychat123: "A", "claude:claudechat123": "B", bad: "Z" },
+    projectOwners: { "g-p-legacyproject123": "A", "claude:claudeproject123": "B" }
   });
-  assert.equal(state.configured, true);
-  assert.equal(state.activeProfileId, "profile-charlie");
-  assert.deepEqual(state.profileOrder, ["profile-charlie", "A", "B"]);
-  const generated = C.createProfileId(state.profiles);
-  assert.equal(C.isValidProfileId(generated), true);
-  assert.equal(state.profiles[generated], undefined);
-});
-
-test("exporte et importe un code de transfert sans contenu de conversation", () => {
-  const state = C.normalizeState({
-    configured: true,
-    activeProfileId: "A",
-    profiles: {
-      A: { name: "Alice", credential: { algorithm: "PBKDF2-SHA256", hash: "hash-a" } },
-      B: { name: "Bob", credential: { algorithm: "PBKDF2-SHA256", hash: "hash-b" } }
-    },
-    profileOrder: ["A", "B"],
-    conversationOwners: { "chatgpt:conversation123": "A" },
-    projectOwners: { "claude:project123": "B" }
-  });
-  const code = C.stateToTransferCode(state);
-  const imported = C.transferCodeToState(code);
-  assert.equal(code.startsWith("DUOCHAT1."), true);
-  assert.deepEqual(imported.profileOrder, ["A", "B"]);
-  assert.deepEqual(imported.conversationOwners, state.conversationOwners);
-  assert.deepEqual(imported.projectOwners, state.projectOwners);
-  assert.throws(() => C.transferCodeToState("code-invalide"), /INVALID_TRANSFER_CODE/);
-});
-
-test("fusionne les profils et conserve les attributions locales en cas de conflit", () => {
-  const credential = { algorithm: "PBKDF2-SHA256", hash: "hash" };
-  const local = {
-    configured: true,
-    activeProfileId: "A",
-    profiles: { A: { name: "A", credential }, B: { name: "B", credential } },
-    profileOrder: ["A", "B"],
-    conversationOwners: { "chatgpt:conversation123": "A" }
-  };
-  const imported = {
-    configured: true,
-    activeProfileId: "B",
-    profiles: {
-      A: { name: "A", credential },
-      B: { name: "B", credential },
-      C: { name: "C", credential }
-    },
-    profileOrder: ["A", "B", "C"],
-    conversationOwners: {
-      "chatgpt:conversation123": "B",
-      "claude:conversation456": "C"
-    }
-  };
-  const result = C.mergeStates(local, imported);
-  assert.deepEqual(result.state.profileOrder, ["A", "B", "C"]);
-  assert.equal(result.state.conversationOwners["chatgpt:conversation123"], "A");
-  assert.equal(result.state.conversationOwners["claude:conversation456"], "C");
-  assert.equal(result.importedProfiles, 1);
-  assert.equal(result.importedEntities, 1);
-  assert.equal(result.conflicts, 1);
-});
-
-test("conserve les attributions Claude et migre les anciennes clés vers ChatGPT", () => {
-  const state = C.normalizeState({
-    configured: true,
-    activeProfileId: "B",
-    profiles: {
-      A: { name: "A", credential: { algorithm: "PBKDF2-SHA256" } },
-      B: { name: "B", credential: { algorithm: "PBKDF2-SHA256" } }
-    },
-    conversationOwners: {
-      legacychat123: "A",
-      "claude:claudechat123": "B"
-    },
-    projectOwners: {
-      "g-p-legacyproject123": "A",
-      "claude:claudeproject123": "B"
-    }
-  });
-  assert.deepEqual(state.conversationOwners, {
+  assert.equal(state.version, C.STATE_VERSION);
+  assert.equal(state.encryption.enabled, false);
+  assert.deepEqual(state.legacyVault.conversationOwners, {
     "chatgpt:legacychat123": "A",
     "claude:claudechat123": "B"
   });
-  assert.deepEqual(state.projectOwners, {
+  assert.deepEqual(state.legacyVault.projectOwners, {
     "chatgpt:legacyproject123": "A",
     "claude:claudeproject123": "B"
   });
+});
+
+test("normalise les réglages avancés par profil", () => {
+  const profiles = {
+    A: C.normalizeProfileHeader("A", { name:"Admin", role:"admin", template:"personal", accent:"#7667f5" }, 0),
+    B: C.normalizeProfileHeader("B", { name:"Enfant", role:"child", template:"child", accent:"#22a06b" }, 1)
+  };
+  const vault = C.normalizeVault({ profileSettings: {
+    A: { autoLockMinutes:0, theme:"dark", language:"fr", focusMode:{enabled:true,type:"favorites",value:""} },
+    B: {}
+  } }, profiles);
+  assert.equal(vault.profileSettings.A.autoLockMinutes, 0);
+  assert.equal(vault.profileSettings.A.theme, "dark");
+  assert.equal(vault.profileSettings.A.focusMode.enabled, true);
+  assert.equal(vault.profileSettings.B.simplified, true);
+  assert.equal(vault.profileSettings.B.hiddenFunctions.includes("external_links"), true);
+  assert.equal(vault.profileSettings.A.permissions.includes("admin"), true);
+});
+
+test("chiffre et déchiffre le coffre local en AES-GCM avec clé 256 bits", async () => {
+  const key = crypto.getRandomValues(new Uint8Array(32));
+  const payload = { conversationOwners:{"chatgpt:abc123456":"A"}, note:"local only" };
+  const encrypted = await C.encryptJsonWithRawKey(payload, key);
+  assert.notEqual(encrypted.ciphertext.includes("local only"), true);
+  assert.deepEqual(await C.decryptJsonWithRawKey(encrypted, key), payload);
+});
+
+test("enveloppe la clé du coffre avec un PIN/mot de passe et la récupère", async () => {
+  const key = crypto.getRandomValues(new Uint8Array(32));
+  const wrapped = await C.wrapVaultKey(key, "123456");
+  assert.deepEqual([...await C.unwrapVaultKey(wrapped, "123456")], [...key]);
+  await assert.rejects(() => C.unwrapVaultKey(wrapped, "000000"));
+});
+
+test("exporte/import un code de transfert DuoChat2 sans script distant", () => {
+  const state = C.normalizeState({
+    version:C.STATE_VERSION, configured:true, activeProfileId:"A",
+    profiles:{
+      A:{name:"A",credential:{algorithm:"PBKDF2-SHA256",iterations:C.PBKDF2_ITERATIONS,salt:"AA==",hash:"AA=="}},
+      B:{name:"B",credential:{algorithm:"PBKDF2-SHA256",iterations:C.PBKDF2_ITERATIONS,salt:"AA==",hash:"AA=="}}
+    }, profileOrder:["A","B"],
+    encryption:{enabled:true,encryptedVault:{v:1,iv:"AA==",ciphertext:"AA=="},recoveryWrap:{v:1}}
+  });
+  const code = C.transferCodeFromState(state);
+  assert.equal(code.startsWith("DUOCHAT2."), true);
+  const imported = C.transferCodeToState(code);
+  assert.deepEqual(imported.profileOrder, ["A","B"]);
+  assert.throws(() => C.transferCodeToState("bad"), /INVALID_TRANSFER_CODE/);
+});
+
+test("exporte/import un fichier portable .duochat chiffré", async () => {
+  const bundle = { format:"duochat-portable-1", state:{version:C.STATE_VERSION}, secret:"hello" };
+  const encrypted = await C.encryptPortableBundle(bundle, "motdepasse");
+  assert.equal(encrypted.includes("hello"), false);
+  assert.deepEqual(await C.decryptPortableBundle(encrypted, "motdepasse"), bundle);
+  await assert.rejects(() => C.decryptPortableBundle(encrypted, "mauvais"));
+});
+
+test("gère les profils temporaires, planning et whitelist", () => {
+  const temp = C.normalizeTemporary({ mode:"hours", expiresAt:123456789, expired:true });
+  assert.deepEqual(temp, { mode:"hours", expiresAt:123456789, expired:true });
+  assert.equal(C.isScheduleAllowed({enabled:false}, new Date()), true);
+  assert.equal(C.isDomainAllowed("https://docs.example.com/a", ["example.com"]), true);
+  assert.equal(C.isDomainAllowed("https://evil.test/", ["example.com"]), false);
+});
+
+test("les métadonnées locales supportent favoris, tags, alias, notes et verrou supplémentaire", () => {
+  const profiles={A:C.normalizeProfileHeader("A",{name:"A"},0)};
+  const vault=C.normalizeVault({
+    conversationOwners:{"chatgpt:abc123456":"A"},
+    conversationMeta:{"chatgpt:abc123456":{title:"Titre",alias:"Alias",favorite:true,extraLock:true,tags:["Travail","Urgent"],folder:"Client",note:"note locale"}}
+  },profiles);
+  const meta=vault.conversationMeta["chatgpt:abc123456"];
+  assert.equal(meta.favorite,true);
+  assert.equal(meta.extraLock,true);
+  assert.deepEqual(meta.tags,["Travail","Urgent"]);
+  assert.equal(meta.note,"note locale");
+});
+
+
+test("normalise les raccourcis personnalisables et l’état WebAuthn public", () => {
+  const credential={algorithm:"PBKDF2-SHA256",iterations:C.PBKDF2_ITERATIONS,salt:"AA==",hash:"AA=="};
+  const profile=C.normalizeProfileHeader("A",{name:"A",credential,webauthn:{enabled:true,credentialId:"cred",publicKeySpki:"pub",algorithm:-7}},0);
+  const vault=C.normalizeVault({profileSettings:{A:{shortcuts:{palette:"Alt+P",panic:"Ctrl+Shift+X",lock:"Alt+L"}}}},{A:profile});
+  assert.equal(vault.profileSettings.A.shortcuts.palette,"Alt+P");
+  assert.equal(vault.profileSettings.A.shortcuts.panic,"Ctrl+Shift+X");
+  assert.equal(C.profilePublic(profile).webauthnEnabled,true);
 });

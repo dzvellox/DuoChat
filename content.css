@@ -333,3 +333,206 @@ a[data-duochat-unassigned="true"] {
     transition: none !important;
   }
 }
+
+/* DuoChat 1.4 — hardened sidebar hiding */
+[data-duochat-hidden-container="true"] {
+  display: none !important;
+}
+
+.duochat-language-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.duochat-language-option {
+  display: grid;
+  grid-template-columns: 34px 1fr 20px;
+  min-height: 54px;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 11px;
+  border: 1px solid var(--dc-border);
+  border-radius: 12px;
+  color: var(--dc-text);
+  background: var(--dc-surface);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.duochat-language-option:hover {
+  border-color: var(--dc-primary-border);
+  background: var(--dc-surface-hover);
+  transform: translateY(-1px);
+}
+
+.duochat-language-option[aria-checked="true"] {
+  border-color: var(--dc-primary);
+  background: var(--dc-surface-soft);
+  box-shadow: inset 0 0 0 1px var(--dc-primary);
+}
+
+.duochat-language-option > span:first-child {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 9px;
+  color: var(--dc-primary);
+  background: color-mix(in srgb, var(--dc-primary) 12%, transparent);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.duochat-language-option strong {
+  font-size: 14px;
+}
+
+.duochat-language-option b {
+  color: var(--dc-primary);
+  text-align: right;
+}
+
+.duochat-language-continue {
+  width: 100%;
+  margin-top: 14px;
+}
+
+@media (max-width: 560px) {
+  .duochat-language-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* New sidebar routes stay invisible until DuoChat explicitly classifies them. */
+html.duochat-guarded a[href*="/c/"]:not([data-duochat-allowed="true"]),
+html.duochat-guarded a[href*="/chat/"]:not([data-duochat-allowed="true"]),
+html.duochat-guarded a[href*="g-p-"]:not([data-duochat-allowed="true"]),
+html.duochat-guarded a[href*="/project/"]:not([data-duochat-allowed="true"]),
+html.duochat-guarded a[href*="/projects/"]:not([data-duochat-allowed="true"]) {
+  visibility: hidden !important;
+}
+
+/* DuoChat 1.5 — privacy, focus and command palette */
+[data-duochat-function-hidden="true"] {
+  display: none !important;
+}
+
+html.duochat-privacy-blur a[data-duochat-allowed="true"] {
+  filter: blur(5px);
+  transition: filter 140ms ease;
+}
+
+html.duochat-privacy-blur a[data-duochat-allowed="true"]:hover,
+html.duochat-privacy-blur a[data-duochat-allowed="true"]:focus-visible {
+  filter: none;
+}
+
+html.duochat-presentation a[data-duochat-allowed="true"],
+html.duochat-screenshot a[data-duochat-allowed="true"] {
+  color: transparent !important;
+  text-shadow: 0 0 8px rgba(128, 128, 128, 0.9) !important;
+  user-select: none !important;
+}
+
+html.duochat-presentation [data-testid*="account" i],
+html.duochat-presentation [data-testid*="profile" i],
+html.duochat-screenshot [data-testid*="account" i],
+html.duochat-screenshot [data-testid*="profile" i] {
+  visibility: hidden !important;
+}
+
+html.duochat-simplified [data-duochat-secondary-ui="true"] {
+  display: none !important;
+}
+
+#duochat-command-palette {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483646;
+  display: grid;
+  place-items: start center;
+  padding: min(14vh, 110px) 18px 18px;
+  background: rgba(8, 10, 18, 0.48);
+  backdrop-filter: blur(10px);
+  font: 400 14px/1.4 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.duochat-command-box {
+  width: min(680px, 100%);
+  overflow: hidden;
+  border: 1px solid rgba(128, 128, 160, 0.35);
+  border-radius: 16px;
+  background: Canvas;
+  color: CanvasText;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.3);
+}
+
+.duochat-command-box input {
+  width: 100%;
+  min-height: 56px;
+  padding: 0 18px;
+  border: 0;
+  border-bottom: 1px solid rgba(128, 128, 160, 0.28);
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 16px;
+}
+
+.duochat-command-results {
+  display: grid;
+  max-height: 420px;
+  overflow: auto;
+  padding: 8px;
+}
+
+.duochat-command-results button {
+  min-height: 44px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.duochat-command-results button:hover,
+.duochat-command-results button[data-active="true"] {
+  background: color-mix(in srgb, var(--duochat-accent, #7667f5) 13%, transparent);
+}
+
+#duochat-gate .duochat-logo,
+#duochat-gate .duochat-button-primary {
+  background: var(--duochat-accent, var(--dc-primary));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.duochat-privacy-blur a[data-duochat-allowed="true"] {
+    transition: none;
+  }
+}
+
+/* DuoChat 1.5 setup wizard */
+.duochat-setup-wizard { max-width: 860px; }
+.duochat-setup-profiles { display: grid; gap: 14px; max-height: min(52vh, 600px); overflow: auto; padding-right: 4px; }
+.duochat-setup-profile { border: 1px solid rgba(148,163,184,.2); border-radius: 16px; padding: 14px; background: rgba(15,23,42,.34); }
+.duochat-setup-profile-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.duochat-setup-profile-head span { width: 12px; height: 12px; border-radius: 999px; background: var(--duochat-profile-color); box-shadow: 0 0 0 4px color-mix(in srgb, var(--duochat-profile-color) 18%, transparent); }
+.duochat-grid-setup { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.duochat-form select { width: 100%; box-sizing: border-box; border: 1px solid rgba(148,163,184,.28); border-radius: 10px; padding: 10px 11px; color: inherit; background: rgba(15,23,42,.7); font: inherit; }
+.duochat-recovery-box { display: grid; gap: 14px; }
+.duochat-recovery-box code { display: block; padding: 16px; border-radius: 14px; border: 1px solid rgba(118,103,245,.45); background: rgba(15,23,42,.72); color: #f8fafc; font-size: 15px; line-height: 1.6; overflow-wrap: anywhere; user-select: all; }
+@media (max-width: 680px) { .duochat-grid-setup { grid-template-columns: 1fr; } .duochat-setup-profiles { max-height: 48vh; } }
+
+html[data-duochat-theme="dark"] #duochat-gate {
+  --dc-bg:#101218; --dc-surface:#171a22; --dc-surface-soft:#202432; --dc-surface-hover:#292d3d; --dc-text:#f4f5fb; --dc-muted:#a8adbd; --dc-border:#2b3040; --dc-primary-border:#7166d9; --dc-primary:#7667f5; --dc-primary-hover:#6758e7; --dc-shadow:0 24px 70px rgba(0,0,0,.38);
+}
+html[data-duochat-theme="light"] #duochat-gate { color-scheme: light; }
+html[data-duochat-theme="dark"] #duochat-gate { color-scheme: dark; }

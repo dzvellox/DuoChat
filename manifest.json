@@ -1,12 +1,14 @@
 {
   "manifest_version": 3,
-  "name": "DuoChat — Profils pour ChatGPT et Claude",
+  "name": "__MSG_extName__",
   "short_name": "DuoChat",
-  "version": "1.3.1",
-  "description": "Sépare localement ChatGPT et Claude entre autant de profils protégés par mot de passe que nécessaire.",
+  "version": "1.5.0",
+  "description": "__MSG_extDescription__",
   "permissions": [
     "storage",
-    "tabs"
+    "tabs",
+    "idle",
+    "alarms"
   ],
   "host_permissions": [
     "https://chatgpt.com/*",
@@ -39,6 +41,7 @@
       ],
       "js": [
         "core.js",
+        "i18n.js",
         "content.js"
       ],
       "css": [
@@ -53,7 +56,30 @@
         "default": "Alt+Shift+L",
         "mac": "Alt+Shift+L"
       },
-      "description": "Verrouiller DuoChat"
+      "description": "__MSG_lockCommand__"
+    },
+    "panic-duochat": {
+      "suggested_key": {
+        "default": "Alt+Shift+X",
+        "mac": "Alt+Shift+X"
+      },
+      "description": "Panic lock DuoChat"
+    },
+    "profile-picker": {
+      "suggested_key": {
+        "default": "Alt+Shift+P",
+        "mac": "Alt+Shift+P"
+      },
+      "description": "Open DuoChat profile picker"
+    },
+    "screenshot-mode": {
+      "suggested_key": {
+        "default": "Alt+Shift+S",
+        "mac": "Alt+Shift+S"
+      },
+      "description": "Toggle DuoChat screenshot mode"
     }
-  }
+  },
+  "default_locale": "fr",
+  "minimum_chrome_version": "102"
 }

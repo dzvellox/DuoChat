@@ -4,6 +4,8 @@ document.documentElement.classList.add("duochat-pending");
 
 (function runDuoChatGuard() {
   const C = globalThis.DuoChatCore;
+  const I = globalThis.DuoChatI18n;
+  let language = null;
   const currentSite = C.getSupportedSite(location.href);
   const siteName = currentSite ? currentSite.name : "ce service";
   const homeUrl = currentSite ? currentSite.homeUrl : location.origin;
@@ -15,9 +17,220 @@ document.documentElement.classList.add("duochat-pending");
   let observer = null;
   let projectChatClaimInFlight = false;
   let titleShieldActive = true;
-  let protectedTitle = "DuoChat — Verrouillé";
+  let protectedTitle = "DuoChat";
   let pendingPageTitle = "";
   let pendingPageTitleUrl = "";
+  let lastActivitySentAt = 0;
+  let paletteOpen = false;
+  let metadataSyncTimer = null;
+
+
+  function escapeHtml(value) {
+    return String(value == null ? "" : value)
+      .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+  }
+
+  function activeSettings() {
+    return snapshot && snapshot.activeSettings ? snapshot.activeSettings : {};
+  }
+
+  function hasPermission(permission) {
+    const permissions = Array.isArray(activeSettings().permissions) ? activeSettings().permissions : [];
+    return permissions.includes("admin") || permissions.includes(permission);
+  }
+
+  function sendActivity() {
+    const now = Date.now();
+    if (now - lastActivitySentAt < 15000) return;
+    lastActivitySentAt = now;
+    send({ type: "USER_ACTIVITY" }).catch(() => undefined);
+  }
+
+  function metaFor(kind, id) {
+    if (!snapshot || !id) return null;
+    return kind === "project" ? snapshot.projectMeta[id] : snapshot.conversationMeta[id];
+  }
+
+  function profileAccent() {
+    const profile = snapshot && snapshot.profiles && snapshot.profiles[snapshot.activeProfileId];
+    return (activeSettings().accent || (profile && profile.accent) || "#7667F5");
+  }
+
+  function applyVisualProtection() {
+    if (!snapshot || !snapshot.unlocked) return;
+    const root = document.documentElement;
+    const settings = activeSettings();
+    root.style.setProperty("--duochat-accent", profileAccent());
+    root.dataset.duochatTheme = ["light", "dark"].includes(settings.theme) ? settings.theme : "system";
+    root.style.colorScheme = settings.theme === "dark" ? "dark" : settings.theme === "light" ? "light" : "light dark";
+    root.classList.toggle("duochat-privacy-blur", settings.privacyBlur === true);
+    root.classList.toggle("duochat-presentation", snapshot.presentationMode === true);
+    root.classList.toggle("duochat-screenshot", snapshot.screenshotMode === true);
+    root.classList.toggle("duochat-simplified", settings.simplified === true);
+  }
+
+  function isSensitiveAuthorized(entityId) {
+    return snapshot && Array.isArray(snapshot.authorizedSensitiveIds) && snapshot.authorizedSensitiveIds.includes(entityId);
+  }
+
+  function showSensitiveChallenge(entityId, entityType) {
+    document.documentElement.classList.add("duochat-pending");
+    shieldBrowserTitle(t("verifyingTitle"));
+    const panel = gateShell(t("extraAccessTitle"), t("extraAccessLead"));
+    const form = document.createElement("form");
+    form.className = "duochat-form";
+    form.innerHTML = `<div class="duochat-field"><label>${escapeHtml(t("extraPasswordLabel"))}</label><input name="password" type="password" autocomplete="current-password" required></div><p class="duochat-error" role="alert"></p><div class="duochat-actions"><button class="duochat-button duochat-button-primary" type="submit">${escapeHtml(t("extraUnlock10"))}</button><button class="duochat-button duochat-button-secondary" type="button" data-cancel>${escapeHtml(t("back"))}</button></div>`;
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const submit = form.querySelector('[type="submit"]');
+      submit.disabled = true;
+      try {
+        snapshot = await send({ type: "AUTHORIZE_ENTITY", entityId, password: form.elements.password.value });
+        await evaluateRoute(true);
+      } catch (error) {
+        form.querySelector(".duochat-error").textContent = friendlyError(error.message);
+        submit.disabled = false;
+        form.elements.password.select();
+      }
+    });
+    form.querySelector("[data-cancel]").addEventListener("click", () => location.assign(homeUrl));
+    panel.appendChild(form);
+    requestAnimationFrame(() => form.elements.password.focus());
+  }
+
+  function featureSelectors(feature) {
+    const map = {
+      apps: ['a[href*="/apps"]', 'a[href*="/connectors"]'],
+      gpts: ['a[href*="/gpts"]', 'a[href*="/g/"]'],
+      settings: ['a[href*="/settings"]', 'button[aria-label*="Settings" i]', 'button[aria-label*="Param" i]'],
+      share: ['button[aria-label*="Share" i]', 'button[aria-label*="Partager" i]'],
+      files: ['button[aria-label*="file" i]', 'button[aria-label*="fichier" i]', 'input[type="file"]'],
+      projects_create: ['button[aria-label*="project" i]', 'button[aria-label*="projet" i]']
+    };
+    return map[feature] || [];
+  }
+
+  function applyFunctionRestrictions() {
+    if (!snapshot || !snapshot.unlocked) return;
+    for (const node of document.querySelectorAll('[data-duochat-function-hidden="true"]')) {
+      node.removeAttribute("data-duochat-function-hidden");
+    }
+    const hidden = new Set(Array.isArray(activeSettings().hiddenFunctions) ? activeSettings().hiddenFunctions : []);
+    if (!hasPermission("access_settings")) hidden.add("settings");
+    if (!hasPermission("create_projects")) hidden.add("projects_create");
+    if (!hasPermission("export_own")) hidden.add("share");
+    for (const feature of hidden) {
+      for (const selector of featureSelectors(feature)) {
+        for (const element of document.querySelectorAll(selector)) element.setAttribute("data-duochat-function-hidden", "true");
+      }
+    }
+  }
+
+  function focusAllows(kind, id, meta) {
+    const focus = activeSettings().focusMode;
+    if (!focus || focus.enabled !== true) return true;
+    if (kind === "project" && focus.type === "project") return id === focus.value;
+    if (kind !== "conversation") return focus.type !== "project";
+    if (focus.type === "project") return meta && meta.projectId === focus.value;
+    if (focus.type === "tag") return meta && Array.isArray(meta.tags) && meta.tags.includes(focus.value);
+    if (focus.type === "folder") return meta && meta.folder === focus.value;
+    if (focus.type === "favorites") return meta && meta.favorite === true;
+    return true;
+  }
+
+  function syncVisibleMetadata() {
+    if (!snapshot || !snapshot.unlocked || metadataSyncTimer) return;
+    metadataSyncTimer = setTimeout(() => {
+      metadataSyncTimer = null;
+      const tasks = [];
+      for (const link of document.querySelectorAll('a[href][data-duochat-allowed="true"]')) {
+        const conversationId = C.extractConversationId(link.href);
+        const projectId = C.extractProjectId(link.href);
+        const kind = projectId ? "project" : (conversationId ? "conversation" : null);
+        const id = projectId || conversationId;
+        if (!kind || !id) continue;
+        const label = (link.getAttribute("aria-label") || link.textContent || "").replace(/\s+/g, " ").trim().slice(0, 160);
+        if (!label) continue;
+        const known = metaFor(kind, id);
+        if (known && known.title === label && known.url === link.href) continue;
+        tasks.push(send({ type: "UPSERT_ENTITY_META", entityType: kind, entityId: id, patch: { title: label, url: link.href, lastSeenAt: Date.now() } }).catch(() => undefined));
+        if (tasks.length >= 20) break;
+      }
+      if (tasks.length) Promise.allSettled(tasks).then(() => undefined);
+    }, 800);
+  }
+
+  function showExternalBlocked(url) {
+    const panel = gateShell(t("externalBlockedTitle"), t("externalBlockedLead", { domain: new URL(url).hostname }));
+    const actions = document.createElement("div");
+    actions.className = "duochat-actions";
+    const back = document.createElement("button");
+    back.className = "duochat-button duochat-button-primary";
+    back.textContent = t("close");
+    back.addEventListener("click", () => { document.getElementById("duochat-gate")?.remove(); document.documentElement.classList.remove("duochat-pending"); });
+    actions.appendChild(back);
+    panel.appendChild(actions);
+  }
+
+  function closeCommandPalette() {
+    document.getElementById("duochat-command-palette")?.remove();
+    paletteOpen = false;
+  }
+
+  function openCommandPalette() {
+    if (!snapshot || !snapshot.unlocked || paletteOpen) return;
+    paletteOpen = true;
+    const overlay = document.createElement("div");
+    overlay.id = "duochat-command-palette";
+    overlay.innerHTML = `<div class="duochat-command-box"><input type="search" placeholder="${escapeHtml(t("commandPlaceholder"))}" autocomplete="off"><div class="duochat-command-results"></div></div>`;
+    document.documentElement.appendChild(overlay);
+    const input = overlay.querySelector("input");
+    const results = overlay.querySelector(".duochat-command-results");
+    const render = () => {
+      const query = input.value.trim().toLowerCase();
+      const commands = [
+        { label: t("commandLock"), run: () => send({ type: "LOCK" }) },
+        { label: "Panic Lock", run: () => send({ type: "PANIC_LOCK" }) },
+        { label: t(snapshot.presentationMode ? "commandPresentationOff" : "commandPresentationOn"), run: () => send({ type: "SET_MODE", mode: "presentation", enabled: !snapshot.presentationMode }) },
+        { label: t(snapshot.screenshotMode ? "commandScreenshotOff" : "commandScreenshotOn"), run: () => send({ type: "SET_MODE", mode: "screenshot", enabled: !snapshot.screenshotMode }) },
+              ];
+      if (hasPermission("access_settings")) commands.push({ label: t("commandDashboard"), run: () => chrome.runtime.sendMessage({ type: "OPEN_DASHBOARD_REQUEST" }) });
+      for (const id of snapshot.profileOrder) {
+        if (id === snapshot.activeProfileId || !snapshot.profiles[id]) continue;
+        commands.push({ label: t("commandSwitchProfile", { name: snapshot.profiles[id].name }), run: () => { closeCommandPalette(); showLogin(id); return Promise.resolve(); } });
+      }
+      for (const [id, meta] of Object.entries(snapshot.conversationMeta || {})) {
+        const title = meta.alias || meta.title || id;
+        commands.push({ label: `Chat: ${title}`, run: () => { if (meta.url) location.assign(meta.url); return Promise.resolve(); } });
+      }
+      const filtered = commands.filter((item) => !query || item.label.toLowerCase().includes(query)).slice(0, 12);
+      results.replaceChildren();
+      filtered.forEach((item, index) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = item.label;
+        if (index === 0) button.dataset.active = "true";
+        button.addEventListener("click", async () => {
+          try { await item.run(); } catch (_error) {}
+          closeCommandPalette();
+        });
+        results.appendChild(button);
+      });
+    };
+    input.addEventListener("input", render);
+    overlay.addEventListener("click", (event) => { if (event.target === overlay) closeCommandPalette(); });
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") { event.preventDefault(); closeCommandPalette(); }
+      if (event.key === "Enter") { const first = results.querySelector("button"); if (first) first.click(); }
+    });
+    render();
+    requestAnimationFrame(() => input.focus());
+  }
+
+  function t(key, vars) {
+    return I.t(language || "fr", key, vars);
+  }
 
   function send(message) {
     return new Promise((resolve, reject) => {
@@ -54,7 +267,7 @@ document.documentElement.classList.add("duochat-pending");
     panel.innerHTML = `
       <div class="duochat-brand">
         <div class="duochat-logo">${iconMarkup()}</div>
-        <div class="duochat-brand-copy"><strong>DuoChat</strong><span>Profils locaux protégés</span></div>
+        <div class="duochat-brand-copy"><strong>DuoChat</strong><span>${t("brandSubtitle")}</span></div>
       </div>
       <h1></h1>
       <p class="duochat-lead"></p>
@@ -93,23 +306,24 @@ document.documentElement.classList.add("duochat-pending");
     }
     pendingPageTitle = "";
     pendingPageTitleUrl = "";
-    document.documentElement.classList.remove("duochat-pending");
+    // Filter every protected/unassigned sidebar item before revealing the host page.
+    applyVisualProtection();
+    applyFunctionRestrictions();
     filterProtectedLinks();
+    syncVisibleMetadata();
+    document.documentElement.classList.remove("duochat-pending");
   }
 
   function friendlyError(code) {
-    if (code === "WRONG_PASSWORD") return "Mot de passe incorrect.";
-    if (code === "PASSWORD_TOO_SHORT") return `Utilise au moins ${C.MIN_PASSWORD_LENGTH} caractères.`;
+    if (code === "WRONG_PASSWORD") return t("errorWrongPassword");
+    if (code === "PASSWORD_TOO_SHORT") return t("errorPasswordShort", { count: C.MIN_PASSWORD_LENGTH });
     if (code && code.startsWith("TEMPORARILY_BLOCKED:")) {
-      return `Trop d’essais. Réessaie dans ${code.split(":")[1]} secondes.`;
+      return t("errorBlocked", { seconds: code.split(":")[1] });
     }
-    if (code === "CONVERSATION_BELONGS_TO_OTHER_PROFILE") {
-      return "Cette discussion appartient déjà à l’autre profil.";
-    }
-    if (code === "PROJECT_BELONGS_TO_OTHER_PROFILE") {
-      return "Ce projet appartient déjà à l’autre profil.";
-    }
-    return "Une erreur est survenue. Recharge la page et réessaie.";
+    if (code === "CONVERSATION_BELONGS_TO_OTHER_PROFILE") return t("errorConversationOther");
+    if (code === "PROJECT_BELONGS_TO_OTHER_PROFILE") return t("errorProjectOther");
+    if (code === "WEBAUTHN_POPUP_REQUIRED" || code === "WEBAUTHN_REQUIRED") return t("webauthnPopupRequired");
+    return t("errorGeneric");
   }
 
   function collectVisibleEntities() {
@@ -125,111 +339,253 @@ document.documentElement.classList.add("duochat-pending");
     return { conversationIds: [...conversationIds], projectIds: [...projectIds] };
   }
 
+  function showLanguageChooser() {
+    document.documentElement.classList.add("duochat-pending");
+    shieldBrowserTitle("DuoChat");
+    const guessed = I.normalizeLanguage(navigator.language) || "fr";
+    let selected = guessed;
+    language = selected;
+    const panel = gateShell(t("languageWelcomeTitle"), t("languageWelcomeLead"));
+    const list = document.createElement("div");
+    list.className = "duochat-language-list";
+    list.setAttribute("role", "radiogroup");
+    const continueButton = document.createElement("button");
+    continueButton.type = "button";
+    continueButton.className = "duochat-button duochat-button-primary duochat-language-continue";
+    continueButton.textContent = t("languageSave");
+
+    const renderOptions = () => {
+      list.replaceChildren();
+      for (const item of I.SUPPORTED_LANGUAGES) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "duochat-language-option";
+        button.setAttribute("role", "radio");
+        button.setAttribute("aria-checked", String(item.id === selected));
+        const code = document.createElement("span");
+        code.textContent = item.id.toUpperCase();
+        const label = document.createElement("strong");
+        label.textContent = item.nativeLabel;
+        const check = document.createElement("b");
+        check.textContent = item.id === selected ? "✓" : "";
+        button.append(code, label, check);
+        button.addEventListener("click", () => {
+          selected = item.id;
+          language = selected;
+          panel.querySelector("h1").textContent = t("languageWelcomeTitle");
+          panel.querySelector(".duochat-lead").textContent = t("languageWelcomeLead");
+          continueButton.textContent = t("languageSave");
+          renderOptions();
+        });
+        list.appendChild(button);
+      }
+    };
+
+    continueButton.addEventListener("click", async () => {
+      continueButton.disabled = true;
+      try {
+        const result = await send({ type: "SET_LANGUAGE", language: selected });
+        language = result.language;
+        await refresh();
+      } catch (_error) {
+        continueButton.disabled = false;
+      }
+    });
+    renderOptions();
+    panel.append(list, continueButton);
+  }
+
   function showSetup() {
     document.documentElement.classList.add("duochat-pending");
-    shieldBrowserTitle("DuoChat — Configuration");
-    const panel = gateShell(
-      "Créer les premiers profils",
-      "Chaque profil possède son propre mot de passe et ne voit que les discussions et projets qui lui sont attribués."
-    );
+    shieldBrowserTitle(t("setupTitleBrowser"));
+    const panel = gateShell(t("gateSetupTitle"), t("setupWizardLead"));
     const form = document.createElement("form");
-    form.className = "duochat-form";
+    form.className = "duochat-form duochat-setup-wizard";
     form.innerHTML = `
-      <div class="duochat-grid">
-        <div class="duochat-fields">
-          <div class="duochat-field"><label for="dc-name-a">Nom du profil A</label><input id="dc-name-a" name="nameA" value="Utilisateur A" autocomplete="nickname" maxlength="30"></div>
-          <div class="duochat-field"><label for="dc-password-a">Mot de passe A</label><input id="dc-password-a" name="passwordA" type="password" minlength="6" autocomplete="new-password" required></div>
-          <div class="duochat-field"><label for="dc-confirm-a">Confirmer le mot de passe A</label><input id="dc-confirm-a" name="confirmA" type="password" minlength="6" autocomplete="new-password" required></div>
-        </div>
-        <div class="duochat-fields">
-          <div class="duochat-field"><label for="dc-name-b">Nom du profil B</label><input id="dc-name-b" name="nameB" value="Utilisateur B" autocomplete="nickname" maxlength="30"></div>
-          <div class="duochat-field"><label for="dc-password-b">Mot de passe B</label><input id="dc-password-b" name="passwordB" type="password" minlength="6" autocomplete="new-password" required></div>
-          <div class="duochat-field"><label for="dc-confirm-b">Confirmer le mot de passe B</label><input id="dc-confirm-b" name="confirmB" type="password" minlength="6" autocomplete="new-password" required></div>
-        </div>
+      <div class="duochat-field">
+        <label for="dc-profile-count">${t("profileCount")}</label>
+        <select id="dc-profile-count" name="profileCount">
+          ${Array.from({ length: 7 }, (_, index) => index + 2).map((count) => `<option value="${count}" ${count === 2 ? "selected" : ""}>${count}</option>`).join("")}
+        </select>
       </div>
-      <div>
-        <div class="duochat-label">Premier profil à ouvrir</div>
-        <div class="duochat-profile-list" role="group" aria-label="Premier profil">
-          <button class="duochat-profile-choice" type="button" data-profile="A" aria-pressed="true"><strong>Utilisateur A</strong><span>Profil mémorisé au démarrage</span></button>
-          <button class="duochat-profile-choice" type="button" data-profile="B" aria-pressed="false"><strong>Utilisateur B</strong><span>Profil mémorisé au démarrage</span></button>
-        </div>
+      <div class="duochat-setup-profiles"></div>
+      <div class="duochat-field">
+        <label for="dc-first-profile">${t("firstProfile")}</label>
+        <select id="dc-first-profile" name="firstProfile"></select>
       </div>
-      <label class="duochat-check"><input name="importVisible" type="checkbox" checked><span>Attribuer les discussions et projets actuellement visibles dans la barre latérale au premier profil.</span></label>
+      <label class="duochat-check"><input name="importVisible" type="checkbox" checked><span>${t("importVisibleHelp")}</span></label>
+      <label class="duochat-check"><input name="autoAssignNew" type="checkbox" checked><span>${t("autoAssignNew")}</span></label>
+      <label class="duochat-check"><input name="promptUnassigned" type="checkbox" checked><span>${t("promptUnassigned")}</span></label>
       <p class="duochat-error" role="alert" aria-live="polite"></p>
-      <button class="duochat-button duochat-button-primary" type="submit">Créer les profils</button>
+      <button class="duochat-button duochat-button-primary" type="submit">${t("createProtectedProfiles")}</button>
     `;
     panel.appendChild(form);
-    let firstProfileId = "A";
-    const choices = [...form.querySelectorAll(".duochat-profile-choice")];
-    const updateChoiceNames = () => {
-      choices[0].querySelector("strong").textContent = form.elements.nameA.value.trim() || "Utilisateur A";
-      choices[1].querySelector("strong").textContent = form.elements.nameB.value.trim() || "Utilisateur B";
+
+    const profilesRoot = form.querySelector(".duochat-setup-profiles");
+    const firstSelect = form.elements.firstProfile;
+    const templateOptions = [
+      ["personal", "templatePersonal", "👤"],
+      ["work", "templateWork", "💼"],
+      ["study", "templateStudy", "🎓"],
+      ["development", "templateDevelopment", "💻"],
+      ["guest", "templateGuest", "🕒"],
+      ["child", "templateChild", "🧩"]
+    ];
+    const accents = ["#7667F5", "#22A06B", "#D97706", "#E5484D", "#2563EB", "#9333EA", "#0891B2", "#DB2777"];
+
+    const renderProfiles = () => {
+      const count = Math.max(2, Math.min(8, Number(form.elements.profileCount.value) || 2));
+      const previous = [...profilesRoot.querySelectorAll(".duochat-setup-profile")].map((card) => ({
+        name: card.querySelector('[name="name"]').value,
+        template: card.querySelector('[name="template"]').value,
+        password: card.querySelector('[name="password"]').value,
+        confirm: card.querySelector('[name="confirm"]').value
+      }));
+      profilesRoot.replaceChildren();
+      firstSelect.replaceChildren();
+      for (let index = 0; index < count; index += 1) {
+        const saved = previous[index] || {};
+        const defaultName = index === 0 ? t("defaultUserA") : index === 1 ? t("defaultUserB") : `${t("users")} ${index + 1}`;
+        const card = document.createElement("section");
+        card.className = "duochat-setup-profile";
+        card.dataset.index = String(index);
+        card.innerHTML = `
+          <div class="duochat-setup-profile-head"><strong>${index === 0 ? t("administrator") : `${t("profileName")} ${index + 1}`}</strong><span style="--duochat-profile-color:${accents[index]}"></span></div>
+          <div class="duochat-grid duochat-grid-setup">
+            <div class="duochat-field"><label>${t("profileName")}</label><input name="name" maxlength="30" autocomplete="nickname" value="${String(saved.name || defaultName).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/\"/g,"&quot;")}"></div>
+            <div class="duochat-field"><label>${t("profileTemplate")}</label><select name="template">${templateOptions.map(([value, key, icon]) => `<option value="${value}" ${saved.template === value || (!saved.template && value === (index === 0 ? "personal" : "personal")) ? "selected" : ""}>${icon} ${t(key)}</option>`).join("")}</select></div>
+            <div class="duochat-field"><label>${t("profilePassword")}</label><input name="password" type="password" minlength="${C.MIN_PASSWORD_LENGTH}" autocomplete="new-password" required value="${String(saved.password || "").replace(/&/g,"&amp;").replace(/\"/g,"&quot;")}"></div>
+            <div class="duochat-field"><label>${t("confirmPasswordGeneric")}</label><input name="confirm" type="password" minlength="${C.MIN_PASSWORD_LENGTH}" autocomplete="new-password" required value="${String(saved.confirm || "").replace(/&/g,"&amp;").replace(/\"/g,"&quot;")}"></div>
+          </div>
+        `;
+        const nameInput = card.querySelector('[name="name"]');
+        nameInput.addEventListener("input", () => {
+          const option = firstSelect.querySelector(`option[value="${index}"]`);
+          if (option) option.textContent = nameInput.value.trim() || defaultName;
+        });
+        profilesRoot.appendChild(card);
+        const option = document.createElement("option");
+        option.value = String(index);
+        option.textContent = saved.name || defaultName;
+        firstSelect.appendChild(option);
+      }
     };
-    form.elements.nameA.addEventListener("input", updateChoiceNames);
-    form.elements.nameB.addEventListener("input", updateChoiceNames);
-    for (const choice of choices) {
-      choice.addEventListener("click", () => {
-        firstProfileId = choice.dataset.profile;
-        for (const item of choices) item.setAttribute("aria-pressed", String(item === choice));
-      });
-    }
+
+    form.elements.profileCount.addEventListener("change", renderProfiles);
+    renderProfiles();
+
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       const error = form.querySelector(".duochat-error");
-      error.textContent = "";
-      if (form.elements.passwordA.value !== form.elements.confirmA.value) {
-        error.textContent = "La confirmation du mot de passe A ne correspond pas.";
-        form.elements.confirmA.focus();
-        return;
-      }
-      if (form.elements.passwordB.value !== form.elements.confirmB.value) {
-        error.textContent = "La confirmation du mot de passe B ne correspond pas.";
-        form.elements.confirmB.focus();
-        return;
-      }
-      if (!C.isValidPassword(form.elements.passwordA.value) || !C.isValidPassword(form.elements.passwordB.value)) {
-        error.textContent = `Chaque mot de passe doit contenir au moins ${C.MIN_PASSWORD_LENGTH} caractères.`;
-        return;
-      }
       const submit = form.querySelector('[type="submit"]');
+      error.textContent = "";
+      const cards = [...profilesRoot.querySelectorAll(".duochat-setup-profile")];
+      const profiles = [];
+      const names = new Set();
+      for (let index = 0; index < cards.length; index += 1) {
+        const card = cards[index];
+        const name = card.querySelector('[name="name"]').value.trim() || `${t("users")} ${index + 1}`;
+        const password = card.querySelector('[name="password"]').value;
+        const confirm = card.querySelector('[name="confirm"]').value;
+        const template = card.querySelector('[name="template"]').value;
+        if (password !== confirm) {
+          error.textContent = t("passwordMismatchProfile", { name });
+          card.querySelector('[name="confirm"]').focus();
+          return;
+        }
+        if (!C.isValidPassword(password)) {
+          error.textContent = t("eachPassword", { count: C.MIN_PASSWORD_LENGTH });
+          card.querySelector('[name="password"]').focus();
+          return;
+        }
+        const nameKey = name.toLocaleLowerCase();
+        if (names.has(nameKey)) {
+          error.textContent = t("errorDuplicateProfile");
+          card.querySelector('[name="name"]').focus();
+          return;
+        }
+        names.add(nameKey);
+        profiles.push({
+          name,
+          password,
+          template,
+          avatar: templateOptions.find((item) => item[0] === template)?.[2] || "👤",
+          accent: accents[index % accents.length],
+          temporary: template === "guest" ? { mode: "session" } : null
+        });
+      }
+
       submit.disabled = true;
-      submit.textContent = "Création…";
+      submit.textContent = t("creating");
       try {
         const visibleEntities = form.elements.importVisible.checked
           ? collectVisibleEntities()
           : { conversationIds: [], projectIds: [] };
-        snapshot = await send({
-          type: "CONFIGURE",
-          nameA: form.elements.nameA.value,
-          nameB: form.elements.nameB.value,
-          passwordA: form.elements.passwordA.value,
-          passwordB: form.elements.passwordB.value,
+        const firstIndex = Math.max(0, Number(form.elements.firstProfile.value) || 0);
+        const firstProfileId = firstIndex === 0 ? "A" : firstIndex === 1 ? "B" : `P${firstIndex + 1}`;
+        const result = await send({
+          type: "CONFIGURE_ADVANCED",
+          profiles,
           firstProfileId,
+          firstProfileIndex: firstIndex,
           conversationIds: visibleEntities.conversationIds,
-          projectIds: visibleEntities.projectIds
+          projectIds: visibleEntities.projectIds,
+          ruleDefaults: {
+            autoAssignNew: form.elements.autoAssignNew.checked,
+            promptUnassigned: form.elements.promptUnassigned.checked
+          }
         });
-        await evaluateRoute(true);
+        snapshot = result.snapshot;
+        showRecoveryKey(result.recoveryKey);
       } catch (setupError) {
         error.textContent = friendlyError(setupError.message);
         submit.disabled = false;
-        submit.textContent = "Créer les profils";
+        submit.textContent = t("createProtectedProfiles");
       }
     });
-    requestAnimationFrame(() => form.elements.passwordA.focus());
+    requestAnimationFrame(() => profilesRoot.querySelector('[name="password"]')?.focus());
+  }
+
+  function showRecoveryKey(recoveryKey) {
+    document.documentElement.classList.add("duochat-pending");
+    shieldBrowserTitle(t("setupTitleBrowser"));
+    const panel = gateShell(t("recoveryKeyTitle"), t("recoveryKeyLead"));
+    const box = document.createElement("div");
+    box.className = "duochat-recovery-box";
+    const code = document.createElement("code");
+    code.textContent = recoveryKey;
+    const warning = document.createElement("p");
+    warning.className = "duochat-note";
+    warning.textContent = t("recoveryKeyWarning");
+    const copy = document.createElement("button");
+    copy.type = "button";
+    copy.className = "duochat-button duochat-button-secondary";
+    copy.textContent = t("copy");
+    copy.addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(recoveryKey); copy.textContent = t("copied"); }
+      catch (_error) { code.focus?.(); }
+    });
+    const done = document.createElement("button");
+    done.type = "button";
+    done.className = "duochat-button duochat-button-primary";
+    done.textContent = t("recoveryKeySaved");
+    done.addEventListener("click", () => evaluateRoute(true));
+    box.append(code, warning, copy, done);
+    panel.appendChild(box);
   }
 
   function showLogin(preselectedId) {
     document.documentElement.classList.add("duochat-pending");
-    shieldBrowserTitle("DuoChat — Verrouillé");
-    const panel = gateShell(`Qui utilise ${siteName} ?`, "Choisis ton espace puis saisis son mot de passe.");
+    shieldBrowserTitle(t("lockedTitleBrowser"));
+    const panel = gateShell(t("gateLoginTitle", { site: siteName }), t("gateLoginLead"));
     const form = document.createElement("form");
     form.className = "duochat-form";
     form.innerHTML = `
-      <div class="duochat-profile-list" role="group" aria-label="Choix du profil"></div>
-      <div class="duochat-field"><label for="dc-login-password">Mot de passe</label><input id="dc-login-password" name="password" type="password" autocomplete="current-password" required></div>
+      <div class="duochat-profile-list" role="group" aria-label="${t("profileChoiceAria")}"></div>
+      <div class="duochat-field"><label for="dc-login-password">${t("password")}</label><input id="dc-login-password" name="password" type="password" autocomplete="current-password" required></div>
       <p class="duochat-error" role="alert" aria-live="polite"></p>
-      <button class="duochat-button duochat-button-primary" type="submit">Ouvrir cet espace</button>
-      <p class="duochat-note">Le dernier profil choisi est mémorisé, mais son mot de passe sera redemandé après la fermeture du navigateur.</p>
+      <button class="duochat-button duochat-button-primary" type="submit">${t("openSpace")}</button>
+      <p class="duochat-note">${t("loginNote")}</p>
     `;
     panel.appendChild(form);
     const list = form.querySelector(".duochat-profile-list");
@@ -243,7 +599,7 @@ document.documentElement.classList.add("duochat-pending");
       const strong = document.createElement("strong");
       strong.textContent = snapshot.profiles[id].name;
       const span = document.createElement("span");
-      span.textContent = id === snapshot.activeProfileId ? "Dernier profil utilisé" : `Espace ${id}`;
+      span.textContent = id === snapshot.activeProfileId ? t("lastProfileUsed") : t("spaceId", { id });
       button.append(strong, span);
       button.addEventListener("click", () => {
         selectedId = id;
@@ -259,11 +615,12 @@ document.documentElement.classList.add("duochat-pending");
       submit.disabled = true;
       error.textContent = "";
       try {
-        snapshot = await send({
-          type: "UNLOCK",
-          profileId: selectedId,
-          password: form.elements.password.value
-        });
+        const targetProfile = snapshot.profiles[selectedId];
+        if (targetProfile && targetProfile.webauthnEnabled) {
+          throw new Error("WEBAUTHN_POPUP_REQUIRED");
+        }
+        snapshot = await send({ type: "UNLOCK", profileId: selectedId, password: form.elements.password.value });
+        language = I.normalizeLanguage(snapshot.activeSettings && snapshot.activeSettings.language) || language;
         await evaluateRoute(true);
       } catch (loginError) {
         error.textContent = friendlyError(loginError.message);
@@ -274,67 +631,133 @@ document.documentElement.classList.add("duochat-pending");
     requestAnimationFrame(() => form.elements.password.focus());
   }
 
+  function safeAccessDeniedUrl() {
+    try {
+      const target = new URL(homeUrl);
+      target.searchParams.set("duochat_access_denied", "1");
+      return target.href;
+    } catch (_error) {
+      return homeUrl;
+    }
+  }
+
+  function showSafeAccessDenied() {
+    document.documentElement.classList.add("duochat-pending");
+    shieldBrowserTitle("DuoChat — Access denied");
+    const panel = gateShell(t("safeDeniedTitle"), t("safeDeniedLead"));
+    const actions = document.createElement("div");
+    actions.className = "duochat-actions";
+    const back = document.createElement("button");
+    back.className = "duochat-button duochat-button-primary";
+    back.textContent = t("home");
+    back.addEventListener("click", () => location.replace(homeUrl));
+    actions.appendChild(back);
+    panel.appendChild(actions);
+  }
+
   function showBlocked(ownerId, entityType = "conversation") {
     document.documentElement.classList.add("duochat-pending");
+    const deniedUrl = safeAccessDeniedUrl();
+    try { originalReplaceState({}, "", deniedUrl); currentUrl = deniedUrl; } catch (_error) { /* URL shielding is best-effort; DOM protection remains mandatory. */ }
     const isProject = entityType === "project";
-    shieldBrowserTitle(isProject ? "DuoChat — Projet protégé" : "DuoChat — Discussion protégée");
-    const ownerName = snapshot.profiles[ownerId] ? snapshot.profiles[ownerId].name : `Utilisateur ${ownerId}`;
+    shieldBrowserTitle(t(isProject ? "projectProtectedBrowser" : "conversationProtectedBrowser"));
+    const ownerName = snapshot.profiles[ownerId]
+      ? snapshot.profiles[ownerId].name
+      : t("genericUser", { id: ownerId });
     const panel = gateShell(
-      isProject ? "Projet protégé" : "Discussion protégée",
-      isProject
-        ? `Ce projet appartient à ${ownerName}. Son nom et ses discussions restent masqués.`
-        : `Cette discussion appartient à ${ownerName}. Son contenu reste masqué.`
+      t(isProject ? "protectedProjectTitle" : "protectedConversationTitle"),
+      t(isProject ? "protectedProjectLead" : "protectedConversationLead", { owner: ownerName })
     );
     const actions = document.createElement("div");
     actions.className = "duochat-actions";
     const back = document.createElement("button");
     back.className = "duochat-button duochat-button-primary";
-    back.textContent = "Retour à l’accueil";
+    back.textContent = t("home");
     back.addEventListener("click", () => location.assign(homeUrl));
     const change = document.createElement("button");
     change.className = "duochat-button duochat-button-secondary";
-    change.textContent = `Se connecter comme ${ownerName}`;
+    change.textContent = t("loginAs", { owner: ownerName });
     change.addEventListener("click", () => showLogin(ownerId));
     actions.append(back, change);
     panel.appendChild(actions);
   }
 
+  function collectConversationIdsForProject(projectId) {
+    const ids = new Set();
+    for (const link of document.querySelectorAll('a[href]')) {
+      const conversationId = C.extractConversationId(link.href);
+      if (!conversationId) continue;
+      const contextId = getProjectContextForConversationLink(link, projectId);
+      const inMainContent = Boolean(link.closest('main, [role="main"]')) && !link.closest('nav, aside, [role="navigation"]');
+      if (contextId === projectId || inMainContent) ids.add(conversationId);
+    }
+    return [...ids];
+  }
+
   function showUnassigned(entityType, entityId) {
     document.documentElement.classList.add("duochat-pending");
     const isProject = entityType === "project";
-    shieldBrowserTitle(isProject ? "DuoChat — Projet non attribué" : "DuoChat — Discussion non attribuée");
-    const activeName = snapshot.profiles[snapshot.activeProfileId].name;
+    shieldBrowserTitle(t(isProject ? "projectUnassignedBrowser" : "conversationUnassignedBrowser"));
     const panel = gateShell(
-      isProject ? "Projet non attribué" : "Discussion non attribuée",
-      `${isProject ? "Ce projet existait" : "Cette discussion existait"} probablement avant l’installation. ${isProject ? "Il reste masqué" : "Elle reste masquée"} jusqu’à ce que tu choisisses son propriétaire.`
+      t(isProject ? "unassignedProjectTitle" : "unassignedConversationTitle"),
+      t(isProject ? "unassignedProjectLead" : "unassignedConversationLead")
     );
     const error = document.createElement("p");
     error.className = "duochat-error";
     error.setAttribute("role", "alert");
     const actions = document.createElement("div");
-    actions.className = "duochat-actions";
-    const claim = document.createElement("button");
-    claim.className = "duochat-button duochat-button-primary";
-    claim.textContent = `Attribuer à ${activeName}`;
-    claim.addEventListener("click", async () => {
-      claim.disabled = true;
-      try {
-        snapshot = await send(
-          isProject
-            ? { type: "CLAIM_PROJECT", projectId: entityId }
-            : { type: "CLAIM_CONVERSATION", conversationId: entityId }
-        );
-        await evaluateRoute(true);
-      } catch (claimError) {
-        error.textContent = friendlyError(claimError.message);
-        claim.disabled = false;
+    actions.className = "duochat-actions duochat-profile-claim-actions";
+
+    async function claimAs(profileId, password = null) {
+      const target = snapshot.profiles[profileId];
+      if (!target) throw new Error("INVALID_PROFILE");
+      if (profileId !== snapshot.activeProfileId) {
+        if (target.webauthnEnabled) throw new Error("WEBAUTHN_POPUP_REQUIRED");
+        snapshot = await send({ type: "UNLOCK", profileId, password });
       }
-    });
+      snapshot = await send(
+        isProject
+          ? { type: "CLAIM_PROJECT_WITH_CONVERSATIONS", projectId: entityId, conversationIds: collectConversationIdsForProject(entityId) }
+          : { type: "CLAIM_CONVERSATION", conversationId: entityId }
+      );
+      await evaluateRoute(true);
+    }
+
+    for (const profileId of snapshot.profileOrder) {
+      const target = snapshot.profiles[profileId];
+      if (!target) continue;
+      const button = document.createElement("button");
+      button.className = profileId === snapshot.activeProfileId ? "duochat-button duochat-button-primary" : "duochat-button duochat-button-secondary";
+      button.textContent = t("assignTo", { owner: target.name });
+      button.addEventListener("click", async () => {
+        button.disabled = true;
+        error.textContent = "";
+        try {
+          let password = null;
+          if (profileId !== snapshot.activeProfileId) {
+            if (target.webauthnEnabled) {
+              error.textContent = t("webauthnAssignPopupRequired");
+              button.disabled = false;
+              return;
+            }
+            password = window.prompt(t("passwordOf", { name: target.name }));
+            if (password === null) { button.disabled = false; return; }
+          }
+          if (isProject) button.textContent = t("assigningProjectChats");
+          await claimAs(profileId, password);
+        } catch (claimError) {
+          error.textContent = claimError.message === "WRONG_PASSWORD" ? t("errorWrongPassword") : friendlyError(claimError.message);
+          button.disabled = false;
+          button.textContent = t("assignTo", { owner: target.name });
+        }
+      });
+      actions.appendChild(button);
+    }
     const back = document.createElement("button");
     back.className = "duochat-button duochat-button-secondary";
-    back.textContent = "Ne pas ouvrir";
+    back.textContent = t("doNotOpen");
     back.addEventListener("click", () => location.assign(homeUrl));
-    actions.append(claim, back);
+    actions.appendChild(back);
     panel.append(error, actions);
   }
 
@@ -367,21 +790,35 @@ document.documentElement.classList.add("duochat-pending");
     return findNestedProjectId(link);
   }
 
-  function setLinkVisibility(link, visible, recoverable = false) {
+  function getVisibilityContainer(link) {
+    const row = link.closest('li, [role="listitem"], [data-testid*="history" i], [data-testid*="recent" i], [data-testid*="file" i]');
+    if (!row) return link;
+    // Hide the complete visual row (including labels/buttons outside the <a>) whenever
+    // it is a small item. This prevents project/chat/file titles from leaking in sidebars
+    // or recent-item lists even if ChatGPT/Claude moves the title outside the anchor.
+    const anchors = row.querySelectorAll('a[href]');
+    return anchors.length <= 4 ? row : link;
+  }
+
+  function setLinkVisibility(link, visible) {
+    const container = getVisibilityContainer(link);
     if (visible) {
+      link.setAttribute("data-duochat-allowed", "true");
       link.removeAttribute("data-duochat-hidden");
-      if (recoverable) link.setAttribute("data-duochat-unassigned", "true");
-      else link.removeAttribute("data-duochat-unassigned");
+      link.removeAttribute("data-duochat-unassigned");
+      if (container !== link) container.removeAttribute("data-duochat-hidden-container");
     } else {
+      link.removeAttribute("data-duochat-allowed");
       link.setAttribute("data-duochat-hidden", "true");
       link.removeAttribute("data-duochat-unassigned");
+      if (container !== link) container.setAttribute("data-duochat-hidden-container", "true");
     }
   }
 
-  function claimVisibleProjectChats(conversationIds) {
-    if (projectChatClaimInFlight || conversationIds.length === 0) return;
+  function claimVisibleProjectChats(projectId, conversationIds) {
+    if (projectChatClaimInFlight || !projectId || conversationIds.length === 0) return;
     projectChatClaimInFlight = true;
-    send({ type: "CLAIM_CONVERSATIONS", conversationIds })
+    send({ type: "CLAIM_PROJECT_WITH_CONVERSATIONS", projectId, conversationIds })
       .then((nextSnapshot) => {
         snapshot = nextSnapshot;
         filterProtectedLinks();
@@ -394,19 +831,23 @@ document.documentElement.classList.add("duochat-pending");
 
   function filterProtectedLinks() {
     if (!snapshot || !snapshot.configured || !snapshot.unlocked) return;
+    document.documentElement.classList.add("duochat-guarded");
     const openProjectId = C.extractProjectId(location.href);
     const openProjectIsOwn = Boolean(
       openProjectId && snapshot.projectOwners[openProjectId] === snapshot.activeProfileId
     );
     const projectConversationIds = new Set();
+
     for (const link of document.querySelectorAll('a[href]')) {
       const projectId = C.extractProjectId(link.href);
       if (projectId) {
         const projectOwner = snapshot.projectOwners[projectId];
         const projectIsOwn = projectOwner === snapshot.activeProfileId;
-        const projectIsRecoverable = !projectOwner && snapshot.recoveryMode;
-        setLinkVisibility(link, projectIsOwn || projectIsRecoverable, projectIsRecoverable);
-        if (!projectIsOwn) continue;
+        // 1.4 security: unassigned projects stay hidden as well. There is no sidebar reveal switch.
+        const projectMeta = metaFor("project", projectId);
+        const projectVisible = projectIsOwn && focusAllows("project", projectId, projectMeta) && !(projectMeta && projectMeta.hidden);
+        setLinkVisibility(link, projectVisible);
+        if (!projectVisible) continue;
       }
 
       const conversationId = C.extractConversationId(link.href);
@@ -417,24 +858,37 @@ document.documentElement.classList.add("duochat-pending");
       const conversationProjectOwner = conversationProjectId
         ? snapshot.projectOwners[conversationProjectId]
         : null;
+
       if (conversationProjectId && conversationProjectOwner !== snapshot.activeProfileId) {
         setLinkVisibility(link, false);
         continue;
       }
-      const belongsToOpenProject = Boolean(
+
+      const belongsToOwnedProject = Boolean(
         !conversationOwner &&
         ((openProjectIsOwn && isLinkInsideOpenProject(link, openProjectId)) ||
           conversationProjectOwner === snapshot.activeProfileId)
       );
-      const conversationIsRecoverable = !conversationOwner && snapshot.recoveryMode && !belongsToOpenProject;
-      setLinkVisibility(
-        link,
-        conversationIsOwn || belongsToOpenProject || conversationIsRecoverable,
-        conversationIsRecoverable
-      );
-      if (belongsToOpenProject) projectConversationIds.add(conversationId);
+
+      // Unassigned standalone conversations stay hidden. Unassigned conversations inside
+      // the active user's project are visible and are immediately attached to that project owner.
+      const conversationMeta = metaFor("conversation", conversationId);
+      const baseVisible = conversationIsOwn || belongsToOwnedProject;
+      const focusVisible = focusAllows("conversation", conversationId, conversationMeta);
+      const notHidden = !(conversationMeta && conversationMeta.hidden);
+      setLinkVisibility(link, baseVisible && focusVisible && notHidden);
+      if (belongsToOwnedProject && openProjectId) projectConversationIds.add(conversationId);
     }
-    claimVisibleProjectChats([...projectConversationIds]);
+
+    if (openProjectIsOwn) {
+      for (const id of collectConversationIdsForProject(openProjectId)) {
+        if (!snapshot.conversationOwners[id]) projectConversationIds.add(id);
+      }
+      claimVisibleProjectChats(openProjectId, [...projectConversationIds]);
+    }
+    applyFunctionRestrictions();
+    applyVisualProtection();
+    syncVisibleMetadata();
   }
 
   async function evaluateRoute(isInitial = false) {
@@ -448,6 +902,12 @@ document.documentElement.classList.add("duochat-pending");
       showLogin(snapshot.activeProfileId);
       return;
     }
+    try {
+      if (new URL(location.href).searchParams.get("duochat_access_denied") === "1") {
+        showSafeAccessDenied();
+        return;
+      }
+    } catch (_error) {}
     const projectId = C.extractProjectId(location.href);
     const conversationId = C.extractConversationId(location.href);
     if (!projectId && !conversationId) {
@@ -464,20 +924,17 @@ document.documentElement.classList.add("duochat-pending");
         return;
       }
       if (!projectOwner) {
-        const createdFromOutsideProjects = !isInitial && previousProjectId === null;
-        if (!createdFromOutsideProjects) {
-          showUnassigned("project", projectId);
-          return;
-        }
-        try {
-          snapshot = await send({ type: "CLAIM_PROJECT", projectId });
-          if (evaluationId !== routeEvaluationCount) return;
-          projectOwner = snapshot.activeProfileId;
-        } catch (_error) {
-          snapshot = await send({ type: "GET_SNAPSHOT" });
-          showUnassigned("project", projectId);
-          return;
-        }
+        // Projects are deliberately never silently claimed: DuoChat immediately asks
+        // which profile owns a newly detected or legacy project. This prevents a project
+        // created while the wrong profile is active from being leaked or mis-assigned.
+        send({ type: "RECORD_UNASSIGNED_ENTITY", entityType: "project", entityId: projectId, title: document.title, url: location.href }).catch(() => undefined);
+        showUnassigned("project", projectId);
+        return;
+      }
+      const projectMeta = metaFor("project", projectId);
+      if (projectMeta && projectMeta.extraLock && !isSensitiveAuthorized(projectId)) {
+        showSensitiveChallenge(projectId, "project");
+        return;
       }
       previousProjectId = projectId;
     } else {
@@ -496,6 +953,11 @@ document.documentElement.classList.add("duochat-pending");
       return;
     }
     if (conversationOwner === snapshot.activeProfileId) {
+      const meta = metaFor("conversation", conversationId);
+      if (meta && meta.extraLock && !isSensitiveAuthorized(conversationId)) {
+        showSensitiveChallenge(conversationId, "conversation");
+        return;
+      }
       previousConversationId = conversationId;
       removeGateAndReveal();
       return;
@@ -507,21 +969,47 @@ document.documentElement.classList.add("duochat-pending");
     const createdFromHome = !isInitial && previousConversationId === null;
     if (belongsToOwnedProject || createdFromHome) {
       try {
-        snapshot = await send({ type: "CLAIM_CONVERSATION", conversationId });
+        snapshot = await send({
+          type: "AUTO_ASSIGN_ENTITY",
+          entityType: "conversation",
+          entityId: conversationId,
+          projectId,
+          siteId: currentSite && currentSite.id,
+          title: document.title,
+          url: location.href
+        }) || await send({ type: "GET_SNAPSHOT" });
+        snapshot = await send({ type: "GET_SNAPSHOT" });
         if (evaluationId !== routeEvaluationCount) return;
-        previousConversationId = conversationId;
-        removeGateAndReveal();
-        return;
+        const autoOwner = snapshot.conversationOwners[conversationId];
+        if (autoOwner && autoOwner !== snapshot.activeProfileId) {
+          showBlocked(autoOwner, "conversation");
+          return;
+        }
+        if (autoOwner === snapshot.activeProfileId) {
+          previousConversationId = conversationId;
+          removeGateAndReveal();
+          return;
+        }
       } catch (_error) {
         snapshot = await send({ type: "GET_SNAPSHOT" });
       }
     }
+    send({ type: "RECORD_UNASSIGNED_ENTITY", entityType: "conversation", entityId: conversationId, projectId, title: document.title, url: location.href }).catch(() => undefined);
     showUnassigned("conversation", conversationId);
   }
 
   async function refresh() {
     try {
-      snapshot = await send({ type: "GET_SNAPSHOT" });
+      const [nextSnapshot, languageResult] = await Promise.all([
+        send({ type: "GET_SNAPSHOT" }),
+        send({ type: "GET_LANGUAGE" })
+      ]);
+      snapshot = nextSnapshot;
+      language = I.normalizeLanguage(nextSnapshot.activeSettings && nextSnapshot.activeSettings.language) || I.normalizeLanguage(languageResult.language);
+      if (!language) {
+        showLanguageChooser();
+        return;
+      }
       await evaluateRoute(true);
     } catch (_error) {
       document.documentElement.classList.remove("duochat-pending");
@@ -541,6 +1029,22 @@ document.documentElement.classList.add("duochat-pending");
       if (!snapshot || !snapshot.unlocked) return;
       const link = event.target instanceof Element ? event.target.closest('a[href]') : null;
       if (!link) return;
+      sendActivity();
+      try {
+        const targetUrl = new URL(link.href, location.href);
+        const supportedTarget = C.getSupportedSite(targetUrl.href);
+        const settings = activeSettings();
+        const externalRestricted = Array.isArray(settings.hiddenFunctions) && settings.hiddenFunctions.includes("external_links");
+        const whitelist = Array.isArray(settings.externalDomains) ? settings.externalDomains : [];
+        if (!supportedTarget && targetUrl.protocol.startsWith("http") && (externalRestricted || whitelist.length) && !C.isDomainAllowed(targetUrl.href, whitelist)) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          document.documentElement.classList.add("duochat-pending");
+          send({ type: "RECORD_SECURITY_EVENT", action: "external_link_blocked", detail: targetUrl.hostname }).catch(() => undefined);
+          showExternalBlocked(targetUrl.href);
+          return;
+        }
+      } catch (_error) {}
       const projectId = C.extractProjectId(link.href);
       const conversationId = C.extractConversationId(link.href);
       if (!projectId && !conversationId) return;
@@ -556,16 +1060,7 @@ document.documentElement.classList.add("duochat-pending");
         if (!projectOwner) {
           event.preventDefault();
           event.stopImmediatePropagation();
-          if (!snapshot.recoveryMode) {
-            showUnassigned("project", projectId);
-            return;
-          }
-          try {
-            snapshot = await send({ type: "CLAIM_PROJECT", projectId });
-            location.assign(link.href);
-          } catch (_error) {
-            showUnassigned("project", projectId);
-          }
+          showUnassigned("project", projectId);
           return;
         }
       }
@@ -589,7 +1084,7 @@ document.documentElement.classList.add("duochat-pending");
         );
         event.preventDefault();
         event.stopImmediatePropagation();
-        if (!snapshot.recoveryMode && !isOwnedProjectChat) {
+        if (!isOwnedProjectChat) {
           showUnassigned("conversation", conversationId);
           return;
         }
@@ -626,13 +1121,69 @@ document.documentElement.classList.add("duochat-pending");
   observer.observe(document.documentElement, { childList: true, subtree: true });
 
   chrome.runtime.onMessage.addListener((message) => {
-    if (message && message.type === "DUOCHAT_REFRESH") {
+    if (!message) return;
+    if (message.type === "DUOCHAT_REFRESH") {
       document.documentElement.classList.add("duochat-pending");
-      shieldBrowserTitle("DuoChat — Vérification");
+      shieldBrowserTitle(t("verifyingTitle"));
       refresh();
     }
+    if (message.type === "DUOCHAT_PANIC") {
+      closeCommandPalette();
+      document.documentElement.classList.add("duochat-pending");
+      shieldBrowserTitle("DuoChat — Locked");
+      if (activeSettings().panicNavigateHome !== false) location.replace(homeUrl);
+      else refresh();
+    }
+    if (message.type === "DUOCHAT_PROFILE_PICKER" && snapshot && snapshot.unlocked) showLogin(snapshot.activeProfileId);
   });
 
-  setInterval(handlePotentialNavigation, 500);
+  function shortcutMatches(event, spec) {
+    const value = String(spec || "").trim().toLowerCase();
+    if (!value) return false;
+    const parts = value.split("+").map((x) => x.trim()).filter(Boolean);
+    const key = parts.find((x) => !["ctrl","control","alt","shift","meta","cmd","command"].includes(x));
+    if (!key) return false;
+    const wantCtrl = parts.includes("ctrl") || parts.includes("control");
+    const wantAlt = parts.includes("alt");
+    const wantShift = parts.includes("shift");
+    const wantMeta = parts.includes("meta") || parts.includes("cmd") || parts.includes("command");
+    const actualKey = String(event.key || "").toLowerCase();
+    return actualKey === key && event.ctrlKey === wantCtrl && event.altKey === wantAlt && event.shiftKey === wantShift && event.metaKey === wantMeta;
+  }
+
+  document.addEventListener("keydown", (event) => {
+    sendActivity();
+    const shortcuts = activeSettings().shortcuts || {};
+    if (shortcutMatches(event, shortcuts.palette || "Ctrl+K") || ((event.metaKey && !event.ctrlKey) && shortcutMatches(event, "Meta+K"))) {
+      event.preventDefault(); event.stopImmediatePropagation();
+      if (paletteOpen) closeCommandPalette(); else openCommandPalette();
+      return;
+    }
+    if (shortcutMatches(event, shortcuts.panic || "Alt+Shift+X")) {
+      event.preventDefault(); event.stopImmediatePropagation();
+      send({ type: "PANIC_LOCK" }).catch(() => undefined); return;
+    }
+    if (shortcutMatches(event, shortcuts.lock || "Alt+Shift+L")) {
+      event.preventDefault(); event.stopImmediatePropagation();
+      send({ type: "LOGICAL_LOGOUT" }).catch(() => undefined); return;
+    }
+    if (shortcutMatches(event, shortcuts.presentation || "Alt+Shift+V")) {
+      event.preventDefault(); event.stopImmediatePropagation();
+      send({ type: "SET_MODE", mode: "presentation", enabled: !snapshot.presentationMode }).catch(() => undefined); return;
+    }
+    if (shortcutMatches(event, shortcuts.screenshot || "Alt+Shift+S")) {
+      event.preventDefault(); event.stopImmediatePropagation();
+      send({ type: "SET_MODE", mode: "screenshot", enabled: !snapshot.screenshotMode }).catch(() => undefined); return;
+    }
+    if (event.key === "Escape" && paletteOpen) closeCommandPalette();
+  }, true);
+  for (const activityEvent of ["pointerdown", "scroll", "touchstart"]) {
+    addEventListener(activityEvent, sendActivity, { capture: true, passive: true });
+  }
+  addEventListener("focus", sendActivity, true);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) { sendActivity(); refresh(); } });
+  addEventListener("pageshow", () => refresh());
+
+  setInterval(handlePotentialNavigation, 350);
   refresh();
 })();

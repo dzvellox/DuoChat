@@ -1,0 +1,5 @@
+{
+  "extName": {"message": "DuoChat — Profils pour ChatGPT et Claude"},
+  "extDescription": {"message": "Sépare localement ChatGPT et Claude entre plusieurs profils protégés, avec interface multilingue."},
+  "lockCommand": {"message": "Verrouiller DuoChat"}
+}

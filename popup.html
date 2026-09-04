@@ -12,11 +12,14 @@
         <div class="brand-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2.25 20 5.4v5.86c0 5.05-3.38 9.31-8 10.49-4.62-1.18-8-5.44-8-10.49V5.4l8-3.15Zm-1.07 5.18a3.04 3.04 0 0 0-3.04 3.04v.48H7.4a1.2 1.2 0 0 0-1.2 1.2v4.06a1.2 1.2 0 0 0 1.2 1.2h9.2a1.2 1.2 0 0 0 1.2-1.2v-4.06a1.2 1.2 0 0 0-1.2-1.2h-.49v-.48a3.04 3.04 0 0 0-3.04-3.04h-2.14Zm0 1.55h2.14c.82 0 1.49.67 1.49 1.49v.48h-5.12v-.48c0-.82.67-1.49 1.49-1.49Z"/></svg>
         </div>
-        <div>
+        <div class="brand-copy">
           <h1>DuoChat</h1>
-          <p>Profils locaux protégés</p>
+          <p data-i18n="brandSubtitle">Profils locaux protégés</p>
         </div>
-        <span id="status-pill" class="status-pill">Chargement…</span>
+        <span id="status-pill" class="status-pill" data-i18n="loading">Chargement…</span>
+        <button id="open-settings" class="icon-button" type="button" data-i18n-aria="settings" aria-label="Paramètres" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Zm8 3.5a7.9 7.9 0 0 0-.12-1.38l2-1.55-2-3.46-2.48 1a8.3 8.3 0 0 0-2.38-1.38L14.65 2h-4l-.37 3.23A8.3 8.3 0 0 0 7.9 6.61l-2.48-1-2 3.46 2 1.55A7.9 7.9 0 0 0 5.3 12c0 .47.04.93.12 1.38l-2 1.55 2 3.46 2.48-1a8.3 8.3 0 0 0 2.38 1.38l.37 3.23h4l.37-3.23a8.3 8.3 0 0 0 2.38-1.38l2.48 1 2-3.46-2-1.55c.08-.45.12-.91.12-1.38Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        </button>
       </header>
 
       <section id="loading-view" class="view" aria-live="polite">
@@ -25,36 +28,44 @@
         <div class="skeleton"></div>
       </section>
 
+      <section id="language-view" class="view" hidden>
+        <div class="language-hero">🌐</div>
+        <h2 data-i18n="languageWelcomeTitle">Choisis ta langue</h2>
+        <p class="view-lead" data-i18n="languageWelcomeLead">DuoChat utilisera cette langue dans le menu et sur les écrans de protection.</p>
+        <div id="first-language-list" class="language-list" role="radiogroup" aria-label="Language"></div>
+        <button id="save-first-language" class="button button-primary full-width" type="button" data-i18n="languageSave">Continuer</button>
+      </section>
+
       <section id="setup-view" class="view" hidden>
         <div class="empty-icon" aria-hidden="true">∞</div>
-        <h2>Configuration nécessaire</h2>
-        <p>Ouvre ChatGPT ou Claude pour créer les deux utilisateurs et leurs mots de passe.</p>
+        <h2 data-i18n="setupTitle">Configuration nécessaire</h2>
+        <p data-i18n="setupLead">Ouvre ChatGPT ou Claude pour créer les deux utilisateurs et leurs mots de passe.</p>
         <div class="service-actions">
-          <button id="open-chatgpt" class="button button-primary" type="button">Ouvrir ChatGPT</button>
-          <button id="open-claude" class="button button-secondary" type="button">Ouvrir Claude</button>
+          <button id="open-chatgpt" class="button button-primary" type="button" data-i18n="openChatgpt">Ouvrir ChatGPT</button>
+          <button id="open-claude" class="button button-secondary" type="button" data-i18n="openClaude">Ouvrir Claude</button>
         </div>
         <div class="setup-import">
-          <span class="eyebrow">Deuxième ordinateur</span>
-          <label for="setup-transfer-code">Code de transfert DuoChat</label>
-          <textarea id="setup-transfer-code" rows="3" spellcheck="false" autocomplete="off" placeholder="DUOCHAT1.…"></textarea>
+          <span class="eyebrow" data-i18n="secondComputer">Deuxième ordinateur</span>
+          <label for="setup-transfer-code" data-i18n="transferCode">Code de transfert DuoChat</label>
+          <textarea id="setup-transfer-code" rows="3" spellcheck="false" autocomplete="off" data-i18n-placeholder="transferPlaceholder" placeholder="DUOCHAT2.…"></textarea>
           <p id="setup-import-error" class="error" role="alert" aria-live="polite"></p>
-          <button id="setup-import" class="button button-secondary" type="button">Importer les profils</button>
+          <button id="setup-import" class="button button-secondary" type="button" data-i18n="importProfiles">Importer les profils</button>
         </div>
       </section>
 
       <section id="locked-view" class="view" hidden>
         <div class="section-heading">
           <div>
-            <span class="eyebrow">Espace verrouillé</span>
-            <h2>Quel profil ouvrir ?</h2>
+            <span class="eyebrow" data-i18n="lockedEyebrow">Espace verrouillé</span>
+            <h2 data-i18n="lockedTitle">Quel profil ouvrir ?</h2>
           </div>
         </div>
-        <div id="locked-profiles" class="profile-grid" role="group" aria-label="Choix du profil"></div>
+        <div id="locked-profiles" class="profile-grid" role="group" data-i18n-aria="profileChoiceAria" aria-label="Choix du profil"></div>
         <form id="unlock-form" class="form">
-          <label for="unlock-password">Mot de passe</label>
+          <label for="unlock-password" data-i18n="password">Mot de passe</label>
           <input id="unlock-password" name="password" type="password" autocomplete="current-password" required>
           <p id="unlock-error" class="error" role="alert" aria-live="polite"></p>
-          <button class="button button-primary" type="submit">Ouvrir cet espace</button>
+          <button class="button button-primary" type="submit" data-i18n="openSpace">Ouvrir cet espace</button>
         </form>
       </section>
 
@@ -62,84 +73,120 @@
         <div class="current-profile">
           <div id="current-avatar" class="avatar">A</div>
           <div class="current-copy">
-            <span>Espace actif</span>
+            <span data-i18n="activeSpace">Espace actif</span>
             <strong id="current-name">Utilisateur A</strong>
           </div>
-          <span class="online-dot"><span></span>Ouvert</span>
+          <span class="online-dot"><span></span><b data-i18n="opened">Ouvert</b></span>
         </div>
 
-        <div class="setting-row">
+        <div class="security-notice">
+          <div class="security-notice-icon" aria-hidden="true">✓</div>
           <div>
-            <strong>Récupérer les anciens éléments</strong>
-            <p>Affiche les projets et discussions encore sans propriétaire.</p>
+            <strong data-i18n="recoveryRemovedTitle">Récupération sécurisée</strong>
+            <p data-i18n="recoveryRemovedHelp">Les anciens éléments non attribués restent désormais masqués dans la barre latérale.</p>
           </div>
-          <label class="switch">
-            <input id="recovery-toggle" type="checkbox" aria-label="Mode récupération">
-            <span></span>
-          </label>
         </div>
 
         <div class="divider"></div>
-
         <div class="section-heading compact">
           <div>
-            <span class="eyebrow">Changer d’espace</span>
-            <h2>Utilisateurs</h2>
+            <span class="eyebrow" data-i18n="changeSpace">Changer d’espace</span>
+            <h2 data-i18n="users">Utilisateurs</h2>
           </div>
         </div>
-        <div id="other-profiles" class="other-profiles" aria-label="Autres utilisateurs"></div>
-        <p id="no-other-profiles" class="muted-note" hidden>Aucun autre utilisateur.</p>
+        <div id="other-profiles" class="other-profiles" data-i18n-aria="otherUsersAria" aria-label="Autres utilisateurs"></div>
+        <p id="no-other-profiles" class="muted-note" hidden data-i18n="noOtherUsers">Aucun autre utilisateur.</p>
 
         <form id="switch-form" class="form switch-form" hidden>
-          <label id="switch-label" for="switch-password">Mot de passe</label>
+          <label id="switch-label" for="switch-password" data-i18n="password">Mot de passe</label>
           <input id="switch-password" name="password" type="password" autocomplete="current-password" required>
           <p id="switch-error" class="error" role="alert" aria-live="polite"></p>
           <div class="button-row">
-            <button class="button button-primary" type="submit">Changer d’espace</button>
-            <button id="cancel-switch" class="button button-secondary" type="button">Annuler</button>
+            <button class="button button-primary" type="submit" data-i18n="changeSpaceButton">Changer d’espace</button>
+            <button id="cancel-switch" class="button button-secondary" type="button" data-i18n="cancel">Annuler</button>
           </div>
         </form>
 
-        <button id="show-add-profile" class="button button-secondary full-width" type="button">Ajouter un utilisateur</button>
-        <form id="add-profile-form" class="form inset-form" hidden>
-          <label for="new-profile-name">Nom du nouvel utilisateur</label>
-          <input id="new-profile-name" name="name" maxlength="30" autocomplete="nickname" required>
-          <label for="new-profile-password">Mot de passe</label>
-          <input id="new-profile-password" name="password" type="password" minlength="6" autocomplete="new-password" required>
-          <label for="new-profile-confirm">Confirmer le mot de passe</label>
-          <input id="new-profile-confirm" name="confirm" type="password" minlength="6" autocomplete="new-password" required>
-          <p id="add-profile-error" class="error" role="alert" aria-live="polite"></p>
-          <div class="button-row">
-            <button class="button button-primary" type="submit">Créer l’utilisateur</button>
-            <button id="cancel-add-profile" class="button button-secondary" type="button">Annuler</button>
-          </div>
-        </form>
+        <button id="dashboard-shortcut" class="button button-primary full-width settings-shortcut" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h7v7H4V4Zm9 0h7v4h-7V4ZM4 13h7v7H4v-7Zm9-3h7v10h-7V10Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+          <span data-i18n="dashboardOpen">Ouvrir le Dashboard DuoChat</span>
+        </button>
 
-        <details class="transfer-panel">
-          <summary>Relier un autre ordinateur</summary>
-          <p>Sans serveur : exporte un code, envoie-le à l’autre ordinateur, puis importe-le là-bas.</p>
-          <label for="transfer-code">Code de transfert</label>
-          <textarea id="transfer-code" rows="4" spellcheck="false" autocomplete="off" placeholder="DUOCHAT1.…"></textarea>
-          <p id="transfer-status" class="transfer-status" role="status" aria-live="polite"></p>
-          <div class="transfer-actions">
-            <button id="export-code" class="button button-primary" type="button">Générer</button>
-            <button id="copy-code" class="button button-secondary" type="button">Copier</button>
-            <button id="import-code" class="button button-secondary" type="button">Importer</button>
-          </div>
-          <p class="muted-note">Le code ne contient aucun message, mais il contient les profils, les empreintes des mots de passe et les attributions. Garde-le privé.</p>
-        </details>
+        <button id="settings-shortcut" class="button button-secondary full-width settings-shortcut" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Zm8 3.5a7.9 7.9 0 0 0-.12-1.38l2-1.55-2-3.46-2.48 1a8.3 8.3 0 0 0-2.38-1.38L14.65 2h-4l-.37 3.23A8.3 8.3 0 0 0 7.9 6.61l-2.48-1-2 3.46 2 1.55A7.9 7.9 0 0 0 5.3 12c0 .47.04.93.12 1.38l-2 1.55 2 3.46 2.48-1a8.3 8.3 0 0 0 2.38 1.38l.37 3.23h4l.37-3.23a8.3 8.3 0 0 0 2.38-1.38l2.48 1 2-3.46-2-1.55c.08-.45.12-.91.12-1.38Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+          <span data-i18n="settings">Paramètres</span>
+        </button>
 
         <button id="lock-now" class="button button-quiet" type="button">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3m-9 0h8a2 2 0 0 1 2 2v7H6v-7a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Verrouiller maintenant
+          <span data-i18n="lockNow">Verrouiller maintenant</span>
         </button>
       </section>
 
-      <footer>
-        Stockage local sur ce navigateur · Aucun mot de passe en clair
-      </footer>
+      <section id="settings-view" class="view" hidden>
+        <div class="settings-heading">
+          <button id="back-settings" class="icon-button back-button" type="button" data-i18n-aria="back" aria-label="Retour">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div><span class="eyebrow" data-i18n="settingsEyebrow">DuoChat</span><h2 data-i18n="settingsTitle">Paramètres</h2></div>
+        </div>
+
+        <section class="settings-section">
+          <h3 data-i18n="languageSection">Langue de l’extension</h3>
+          <p data-i18n="languageHelp">Change instantanément la langue du popup et des écrans DuoChat.</p>
+          <div id="settings-language-list" class="language-list compact-language-list" role="radiogroup" aria-label="Language"></div>
+        </section>
+
+        <section class="settings-section">
+          <h3 data-i18n="accountSection">Utilisateurs</h3>
+          <button id="show-add-profile" class="button button-secondary full-width no-top-margin" type="button" data-i18n="addUser">Ajouter un utilisateur</button>
+          <form id="add-profile-form" class="form inset-form" hidden>
+            <label for="new-profile-name" data-i18n="newUserName">Nom du nouvel utilisateur</label>
+            <input id="new-profile-name" name="name" maxlength="30" autocomplete="nickname" required>
+            <label for="new-profile-password" data-i18n="newPassword">Mot de passe</label>
+            <input id="new-profile-password" name="password" type="password" minlength="6" autocomplete="new-password" required>
+            <label for="new-profile-confirm" data-i18n="confirmPassword">Confirmer le mot de passe</label>
+            <input id="new-profile-confirm" name="confirm" type="password" minlength="6" autocomplete="new-password" required>
+            <p id="add-profile-error" class="error" role="alert" aria-live="polite"></p>
+            <div class="button-row">
+              <button class="button button-primary" type="submit" data-i18n="createUser">Créer l’utilisateur</button>
+              <button id="cancel-add-profile" class="button button-secondary" type="button" data-i18n="cancel">Annuler</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="settings-section">
+          <h3 data-i18n="deviceSection">Relier un autre ordinateur</h3>
+          <p data-i18n="deviceHelp">Sans serveur : exporte un code, envoie-le à l’autre ordinateur, puis importe-le là-bas.</p>
+          <label for="transfer-code" class="settings-label" data-i18n="transferCodeLabel">Code de transfert</label>
+          <textarea id="transfer-code" rows="4" spellcheck="false" autocomplete="off" data-i18n-placeholder="transferPlaceholder" placeholder="DUOCHAT2.…"></textarea>
+          <p id="transfer-status" class="transfer-status" role="status" aria-live="polite"></p>
+          <div class="transfer-actions">
+            <button id="export-code" class="button button-primary" type="button" data-i18n="generate">Générer</button>
+            <button id="copy-code" class="button button-secondary" type="button" data-i18n="copy">Copier</button>
+            <button id="import-code" class="button button-secondary" type="button" data-i18n="import">Importer</button>
+          </div>
+          <div id="popup-transfer-qr" class="transfer-qr" hidden></div>
+          <p id="popup-transfer-qr-help" class="muted-note"></p>
+          <p class="muted-note" data-i18n="transferPrivacy">Le code ne contient aucun message, mais il contient les profils, les empreintes des mots de passe et les attributions. Garde-le privé.</p>
+        </section>
+
+        <section class="settings-section settings-security">
+          <h3 data-i18n="securitySection">Sécurité</h3>
+          <strong data-i18n="recoveryRemovedTitle">Récupération sécurisée</strong>
+          <p data-i18n="recoveryRemovedHelp">Les anciens éléments non attribués restent désormais masqués dans la barre latérale.</p>
+          <div class="divider"></div>
+          <strong>Windows Hello / WebAuthn</strong>
+          <p id="webauthn-status" class="muted-note">Protection biométrique facultative du profil actif.</p>
+          <button id="webauthn-toggle" class="button button-secondary full-width" type="button">Activer Windows Hello / WebAuthn</button>
+        </section>
+      </section>
+
+      <footer data-i18n="footer">Stockage local sur ce navigateur · Aucun mot de passe en clair</footer>
     </main>
     <script src="core.js"></script>
+    <script src="i18n.js"></script>
+    <script src="vendor/duochat-qr.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>

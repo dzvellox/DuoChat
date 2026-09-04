@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>DuoChat Dashboard</title>
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand"><img src="icons/icon-48.png" alt=""><div><strong>DuoChat</strong><span>Control Center</span></div></div>
+      <nav id="nav" class="nav"></nav>
+      <div class="sidebar-footer">
+        <div id="sidebar-profile" class="mini-profile"></div>
+        <button id="lock-button" class="ghost danger" type="button">🔒 <span data-t="lock">Verrouiller</span></button>
+      </div>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <div><p id="eyebrow" class="eyebrow">DuoChat</p><h1 id="page-title">Dashboard</h1></div>
+        <div class="top-actions">
+          <button id="presentation-toggle" class="pill" type="button">🎥 <span data-t="presentation">Présentation</span></button>
+          <button id="screenshot-toggle" class="pill" type="button">📸 <span data-t="screenshot">Capture</span></button>
+          <a class="pill" href="https://chatgpt.com/" target="_blank" rel="noreferrer">ChatGPT ↗</a>
+        </div>
+      </header>
+      <div id="flash" class="flash" hidden></div>
+      <section id="page" class="page"></section>
+    </main>
+  </div>
+  <script src="core.js"></script>
+  <script src="i18n.js"></script>
+  <script src="vendor/duochat-qr.js"></script>
+  <script src="dashboard.js"></script>
+</body>
+</html>
